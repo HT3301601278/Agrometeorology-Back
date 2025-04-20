@@ -90,50 +90,6 @@
   - 使用不存在的用户名登录
   - 使用被冻结的账户登录
 
-### 1.3 请求密码重置
-- **URL**: `http://localhost:8080/api/auth/password/reset-request`
-- **方法**: POST
-- **描述**: 发送密码重置验证码到用户邮箱
-- **请求参数**:
-  - `email`: 用户注册的邮箱
-- **响应**:
-```json
-{
-  "success": true,
-  "message": "验证码已发送，请检查您的邮箱",
-  "data": null
-}
-```
-- **测试用例**:
-  - 为已注册邮箱请求重置密码
-  - 为未注册邮箱请求重置密码
-
-### 1.4 重置密码
-- **URL**: `http://localhost:8080/api/auth/password/reset`
-- **方法**: POST
-- **描述**: 使用验证码重置密码
-- **请求体**:
-```json
-{
-  "email": "zhangsan@example.com",
-  "code": "123456",
-  "newPassword": "newPassword123"
-}
-```
-- **响应**:
-```json
-{
-  "success": true,
-  "message": "密码重置成功",
-  "data": null
-}
-```
-- **测试用例**:
-  - 使用正确的验证码重置密码
-  - 使用错误的验证码重置密码
-  - 使用过期的验证码重置密码
-  - 设置过于简单的新密码
-
 ## 2. 用户模块
 基础URL: `http://localhost:8080/api/users`
 
@@ -197,15 +153,33 @@
   - 更新多个字段
   - 更新为已存在的邮箱
 
-### 2.3 修改密码
-- **URL**: `http://localhost:8080/api/users/me/password`
-- **方法**: PUT
-- **描述**: 修改当前登录用户的密码
-- **请求头**: Authorization: Bearer {token}
+### 2.3 请求密码重置
+- **URL**: `http://localhost:8080/api/auth/password/reset-request`
+- **方法**: POST
+- **描述**: 发送密码重置验证码到用户邮箱
+- **请求参数**:
+  - `email`: 用户注册的邮箱
+- **响应**:
+```json
+{
+  "success": true,
+  "message": "验证码已发送，请检查您的邮箱",
+  "data": null
+}
+```
+- **测试用例**:
+  - 为已注册邮箱请求重置密码
+  - 为未注册邮箱请求重置密码
+
+### 2.4 重置密码
+- **URL**: `http://localhost:8080/api/auth/password/reset`
+- **方法**: POST
+- **描述**: 使用验证码重置密码
 - **请求体**:
 ```json
 {
-  "oldPassword": "password123",
+  "email": "zhangsan@example.com",
+  "code": "123456",
   "newPassword": "newPassword123"
 }
 ```
@@ -213,16 +187,17 @@
 ```json
 {
   "success": true,
-  "message": "密码修改成功",
+  "message": "密码重置成功",
   "data": null
 }
 ```
 - **测试用例**:
-  - 使用正确的旧密码修改密码
-  - 使用错误的旧密码修改密码
-  - 新密码与旧密码相同
+  - 使用正确的验证码重置密码
+  - 使用错误的验证码重置密码
+  - 使用过期的验证码重置密码
+  - 设置过于简单的新密码
 
-### 2.4 上传用户头像
+### 2.5 上传用户头像
 - **URL**: `http://localhost:8080/api/files/avatar`
 - **方法**: POST
 - **描述**: 上传用户头像图片
@@ -242,7 +217,7 @@
   - 上传超过大小限制的文件
   - 不提供文件上传
 
-### 2.5 更新用户头像
+### 2.6 更新用户头像
 - **URL**: `http://localhost:8080/api/users/me/avatar`
 - **方法**: PUT
 - **描述**: 更新当前用户的头像URL
@@ -271,7 +246,7 @@
   - 使用无效的URL格式
   - 未提供授权令牌
 
-### 2.6 获取用户信息（管理员）
+### 2.7 获取用户信息（管理员）
 - **URL**: `http://localhost:8080/api/users/{id}`
 - **方法**: GET
 - **描述**: 管理员获取指定用户的详细信息
@@ -299,7 +274,7 @@
   - 管理员获取不存在的用户信息
   - 普通用户尝试访问此接口
 
-### 2.7 更新用户状态（管理员）
+### 2.8 更新用户状态（管理员）
 - **URL**: `http://localhost:8080/api/users/{id}/status`
 - **方法**: PUT
 - **描述**: 管理员冻结或解冻用户账户
@@ -328,7 +303,7 @@
   - 管理员冻结不存在的用户
   - 普通用户尝试访问此接口
 
-### 2.8 删除用户（管理员）
+### 2.9 删除用户（管理员）
 - **URL**: `http://localhost:8080/api/users/{id}`
 - **方法**: DELETE
 - **描述**: 管理员删除指定用户
