@@ -2,6 +2,7 @@ package org.agro.controller;
 
 import org.agro.dto.FieldGroupDTO;
 import org.agro.entity.FieldGroup;
+import org.agro.security.UserDetailsImpl;
 import org.agro.service.FieldGroupService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -102,8 +103,8 @@ public class FieldGroupController {
      * @return 用户ID
      */
     private Long extractUserId(Authentication authentication) {
-        // 根据实际项目中的用户认证实现获取用户ID
-        // 这里假设UserDetails实现中包含了用户ID
-        return Long.valueOf(authentication.getName());
+        // 从认证对象中获取用户详情
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return userDetails.getId();
     }
 } 
