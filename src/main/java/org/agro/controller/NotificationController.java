@@ -3,9 +3,9 @@ package org.agro.controller;
 import org.agro.dto.ApiResponse;
 import org.agro.entity.Notification;
 import org.agro.entity.NotificationSetting;
+import org.agro.repository.NotificationSettingRepository;
 import org.agro.security.UserDetailsImpl;
 import org.agro.service.NotificationService;
-import org.agro.repository.NotificationSettingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -135,4 +135,4 @@ public class NotificationController {
         notificationSettingRepository.save(notificationSetting);
         return ResponseEntity.ok(ApiResponse.success("设置已更新", notificationSetting));
     }
-} 
+}

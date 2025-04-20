@@ -37,7 +37,7 @@ spring:
 
 # JWT配置
 jwt:
-  secret: your_secret_key_here
+  secret: 45a7sd56asd456as4d65as4d65asd456as4d65as4d65asd456as4d65as4d65asd456as4d65as4d65as4d56sa4d56sa4d
   expirationMs: 86400000
 
 # 日志配置
