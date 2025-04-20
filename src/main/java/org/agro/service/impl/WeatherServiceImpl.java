@@ -14,6 +14,7 @@ import org.agro.entity.WeatherHistorical;
 import org.agro.repository.WeatherCurrentRepository;
 import org.agro.repository.WeatherForecastRepository;
 import org.agro.repository.WeatherHistoricalRepository;
+import org.agro.service.SystemConfigService;
 import org.agro.service.WeatherService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,8 +43,8 @@ public class WeatherServiceImpl implements WeatherService {
     private final WeatherCurrentRepository currentRepository;
     private final WeatherForecastRepository forecastRepository;
     private final WeatherHistoricalRepository historicalRepository;
+    private final SystemConfigService systemConfigService;
     
-    private static final int MAX_AGE_CURRENT_WEATHER = 30 * 60; // 30分钟，单位秒
     private static final DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Autowired
@@ -51,13 +52,22 @@ public class WeatherServiceImpl implements WeatherService {
                              OpenWeatherMapConfig weatherConfig,
                              WeatherCurrentRepository currentRepository,
                              WeatherForecastRepository forecastRepository,
-                             WeatherHistoricalRepository historicalRepository) {
+                             WeatherHistoricalRepository historicalRepository,
+                             SystemConfigService systemConfigService) {
         this.restTemplate = restTemplate;
         this.weatherConfig = weatherConfig;
         this.currentRepository = currentRepository;
         this.forecastRepository = forecastRepository;
         this.historicalRepository = historicalRepository;
+        this.systemConfigService = systemConfigService;
         this.objectMapper = new ObjectMapper();
+    }
+    
+    /**
+     * 从系统配置中获取数据拉取频率（秒）
+     */
+    private int getMaxAgeCurrentWeather() {
+        return systemConfigService.getDataFetchInterval() * 60; // 将分钟转换为秒
     }
 
     @Override
@@ -71,10 +81,12 @@ public class WeatherServiceImpl implements WeatherService {
         long currentTime = System.currentTimeMillis() / 1000; // 当前时间戳，单位秒
         
         WeatherCurrent weatherData;
-        if (latestData.isPresent() && (currentTime - latestData.get().getDt() < MAX_AGE_CURRENT_WEATHER)) {
+        // 使用动态获取的缓存时间
+        if (latestData.isPresent() && (currentTime - latestData.get().getDt() < getMaxAgeCurrentWeather())) {
             // 使用数据库中的数据
             weatherData = latestData.get();
-            log.info("Using cached current weather data for lat={}, lon={}", latitude, longitude);
+            log.info("Using cached current weather data for lat={}, lon={}, cache time={}min", 
+                    latitude, longitude, systemConfigService.getDataFetchInterval());
         } else {
             // 调用API获取新数据
             weatherData = fetchCurrentWeatherFromApi(latitude, longitude, request.getUnits(), request.getLang());
