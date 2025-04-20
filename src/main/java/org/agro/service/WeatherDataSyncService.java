@@ -8,6 +8,9 @@ import org.agro.repository.FieldRepository;
 import org.agro.repository.WeatherCurrentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.annotation.SchedulingConfigurer;
+import org.springframework.scheduling.config.ScheduledTaskRegistrar;
+import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,25 +22,46 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Service
-public class WeatherDataSyncService {
+public class WeatherDataSyncService implements SchedulingConfigurer {
 
     private final WeatherService weatherService;
     private final WeatherCurrentRepository currentRepository;
     private final FieldRepository fieldRepository;
+    private final SystemConfigService systemConfigService;
 
     @Autowired
     public WeatherDataSyncService(WeatherService weatherService,
                                  WeatherCurrentRepository currentRepository,
-                                 FieldRepository fieldRepository) {
+                                 FieldRepository fieldRepository,
+                                 SystemConfigService systemConfigService) {
         this.weatherService = weatherService;
         this.currentRepository = currentRepository;
         this.fieldRepository = fieldRepository;
+        this.systemConfigService = systemConfigService;
+    }
+
+    @Override
+    public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
+        // 配置动态调度任务，采用从SystemConfigService获取的时间间隔
+        taskRegistrar.addTriggerTask(
+            // 要执行的任务
+            this::syncCurrentWeatherData,
+            // 触发器（根据配置的分钟数计算）
+            triggerContext -> {
+                int intervalMinutes = systemConfigService.getDataFetchInterval();
+                // 确保最小值为1分钟
+                intervalMinutes = Math.max(1, intervalMinutes);
+                String cronExpression = String.format("0 0/%d * * * ?", intervalMinutes);
+                log.debug("使用数据同步频率: {} 分钟, cron表达式: {}", intervalMinutes, cronExpression);
+                return new CronTrigger(cronExpression).nextExecutionTime(triggerContext);
+            }
+        );
     }
 
     /**
-     * 每10分钟更新一次所有地块的实时天气数据
+     * 同步实时天气数据
+     * 注意：此方法不再使用@Scheduled注解，而是通过SchedulingConfigurer动态配置
      */
-    @Scheduled(fixedRate = 10, timeUnit = TimeUnit.MINUTES)
     public void syncCurrentWeatherData() {
         log.info("开始同步实时天气数据...");
 

@@ -1,6 +1,8 @@
 package org.agro.config;
 
 import lombok.Data;
+import org.agro.service.SystemConfigService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,12 +13,22 @@ import org.springframework.web.client.RestTemplate;
 @ConfigurationProperties(prefix = "openweathermap")
 public class OpenWeatherMapConfig {
     
-    private String apiKey;
-    private String currentWeatherUrl = "https://api.openweathermap.org/data/2.5/weather";
-    private String hourlyForecastUrl = "https://pro.openweathermap.org/data/2.5/forecast/hourly";
-    private String dailyForecastUrl = "https://api.openweathermap.org/data/2.5/forecast/daily";
-    private String climateForecastUrl = "https://pro.openweathermap.org/data/2.5/forecast/climate";
-    private String historicalWeatherUrl = "https://history.openweathermap.org/data/2.5/history/city";
+    private SystemConfigService systemConfigService;
+    private String currentWeatherUrl;
+    private String hourlyForecastUrl;
+    private String dailyForecastUrl;
+    private String climateForecastUrl;
+    private String historicalWeatherUrl;
+    
+    @Autowired
+    public OpenWeatherMapConfig(SystemConfigService systemConfigService) {
+        this.systemConfigService = systemConfigService;
+    }
+    
+    public String getApiKey() {
+        // 从系统配置服务获取API Key
+        return systemConfigService.getApiKey();
+    }
     
     @Bean
     public RestTemplate restTemplate() {
