@@ -1,8 +1,8 @@
 package org.agro.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.agro.dto.WeatherRequestDTO;
 import org.agro.dto.WeatherForecastDTO;
+import org.agro.dto.WeatherRequestDTO;
 import org.agro.entity.Field;
 import org.agro.repository.FieldRepository;
 import org.agro.repository.WeatherCurrentRepository;
@@ -14,7 +14,6 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 天气数据同步服务
@@ -67,7 +66,7 @@ public class WeatherDataSyncService implements SchedulingConfigurer {
 
         // 从数据库获取所有地块
         List<Field> fields = fieldRepository.findAll();
-        
+
         if (fields.isEmpty()) {
             log.warn("数据库中没有地块信息，无法同步天气数据");
             return;
@@ -82,10 +81,10 @@ public class WeatherDataSyncService implements SchedulingConfigurer {
                 // 调用服务获取最新天气数据（该方法会自动保存到数据库）
                 weatherService.getCurrentWeather(request);
 
-                log.info("成功更新地块[{}]({}, {})的实时天气数据", 
+                log.info("成功更新地块[{}]({}, {})的实时天气数据",
                          field.getName(), field.getLatitude(), field.getLongitude());
             } catch (Exception e) {
-                log.error("更新地块[{}]({}, {})的实时天气数据失败", 
+                log.error("更新地块[{}]({}, {})的实时天气数据失败",
                          field.getName(), field.getLatitude(), field.getLongitude(), e);
             }
         }
@@ -102,26 +101,26 @@ public class WeatherDataSyncService implements SchedulingConfigurer {
 
         // 从数据库获取所有地块
         List<Field> fields = fieldRepository.findAll();
-        
+
         if (fields.isEmpty()) {
             log.warn("数据库中没有地块信息，无法同步天气预报数据");
             return;
         }
-        
+
         for (Field field : fields) {
             try {
                 WeatherRequestDTO request = new WeatherRequestDTO();
                 request.setLatitude(field.getLatitude());
                 request.setLongitude(field.getLongitude());
-                
+
                 // 调用WeatherService的getWeatherForecast方法获取预报数据
                 List<WeatherForecastDTO> forecastList = weatherService.getWeatherForecast(request);
-                
-                log.info("成功更新地块[{}]({}, {})的天气预报数据，获取到{}条预报记录", 
-                         field.getName(), field.getLatitude(), field.getLongitude(), 
+
+                log.info("成功更新地块[{}]({}, {})的天气预报数据，获取到{}条预报记录",
+                         field.getName(), field.getLatitude(), field.getLongitude(),
                          forecastList != null ? forecastList.size() : 0);
             } catch (Exception e) {
-                log.error("更新地块[{}]({}, {})的天气预报数据失败", 
+                log.error("更新地块[{}]({}, {})的天气预报数据失败",
                          field.getName(), field.getLatitude(), field.getLongitude(), e);
             }
         }
