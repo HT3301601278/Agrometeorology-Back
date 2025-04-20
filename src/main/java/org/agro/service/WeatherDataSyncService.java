@@ -2,13 +2,14 @@ package org.agro.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.agro.dto.WeatherRequestDTO;
-import org.agro.entity.WeatherCurrent;
+import org.agro.dto.WeatherForecastDTO;
+import org.agro.entity.Field;
+import org.agro.repository.FieldRepository;
 import org.agro.repository.WeatherCurrentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -22,77 +23,85 @@ public class WeatherDataSyncService {
 
     private final WeatherService weatherService;
     private final WeatherCurrentRepository currentRepository;
-    // 可注入Field Repository以获取所有地块坐标
-    
+    private final FieldRepository fieldRepository;
+
     @Autowired
-    public WeatherDataSyncService(WeatherService weatherService, 
-                                 WeatherCurrentRepository currentRepository) {
+    public WeatherDataSyncService(WeatherService weatherService,
+                                 WeatherCurrentRepository currentRepository,
+                                 FieldRepository fieldRepository) {
         this.weatherService = weatherService;
         this.currentRepository = currentRepository;
+        this.fieldRepository = fieldRepository;
     }
-    
+
     /**
      * 每10分钟更新一次所有地块的实时天气数据
-     * 实际应用中，应当从地块表中读取所有有效地块的坐标
      */
     @Scheduled(fixedRate = 10, timeUnit = TimeUnit.MINUTES)
     public void syncCurrentWeatherData() {
         log.info("开始同步实时天气数据...");
+
+        // 从数据库获取所有地块
+        List<Field> fields = fieldRepository.findAll();
         
-        // 这里应该是从Field表中获取所有地块的坐标
-        // 为演示简单起见，这里使用静态经纬度
-        List<Coordinate> coordinates = List.of(
-            new Coordinate(new BigDecimal("32.26"), new BigDecimal("110.09"))
-            // 可以添加更多坐标
-        );
-        
-        for (Coordinate coord : coordinates) {
+        if (fields.isEmpty()) {
+            log.warn("数据库中没有地块信息，无法同步天气数据");
+            return;
+        }
+
+        for (Field field : fields) {
             try {
                 WeatherRequestDTO request = new WeatherRequestDTO();
-                request.setLatitude(coord.getLatitude());
-                request.setLongitude(coord.getLongitude());
-                
+                request.setLatitude(field.getLatitude());
+                request.setLongitude(field.getLongitude());
+
                 // 调用服务获取最新天气数据（该方法会自动保存到数据库）
                 weatherService.getCurrentWeather(request);
-                
-                log.info("成功更新地块坐标({}, {})的实时天气数据", coord.getLatitude(), coord.getLongitude());
+
+                log.info("成功更新地块[{}]({}, {})的实时天气数据", 
+                         field.getName(), field.getLatitude(), field.getLongitude());
             } catch (Exception e) {
-                log.error("更新地块坐标({}, {})的实时天气数据失败", coord.getLatitude(), coord.getLongitude(), e);
+                log.error("更新地块[{}]({}, {})的实时天气数据失败", 
+                         field.getName(), field.getLatitude(), field.getLongitude(), e);
             }
         }
-        
-        log.info("实时天气数据同步完成");
+
+        log.info("实时天气数据同步完成，共同步{}个地块", fields.size());
     }
-    
+
     /**
      * 每天凌晨2点更新一次未来预报数据
      */
     @Scheduled(cron = "0 0 2 * * ?")
     public void syncForecastData() {
         log.info("开始同步天气预报数据...");
+
+        // 从数据库获取所有地块
+        List<Field> fields = fieldRepository.findAll();
         
-        // 类似实时数据同步的逻辑，但调用预报API
-        // 实际实现中需读取所有地块坐标
+        if (fields.isEmpty()) {
+            log.warn("数据库中没有地块信息，无法同步天气预报数据");
+            return;
+        }
         
-        log.info("天气预报数据同步完成");
+        for (Field field : fields) {
+            try {
+                WeatherRequestDTO request = new WeatherRequestDTO();
+                request.setLatitude(field.getLatitude());
+                request.setLongitude(field.getLongitude());
+                
+                // 调用WeatherService的getWeatherForecast方法获取预报数据
+                List<WeatherForecastDTO> forecastList = weatherService.getWeatherForecast(request);
+                
+                log.info("成功更新地块[{}]({}, {})的天气预报数据，获取到{}条预报记录", 
+                         field.getName(), field.getLatitude(), field.getLongitude(), 
+                         forecastList != null ? forecastList.size() : 0);
+            } catch (Exception e) {
+                log.error("更新地块[{}]({}, {})的天气预报数据失败", 
+                         field.getName(), field.getLatitude(), field.getLongitude(), e);
+            }
+        }
+
+        log.info("天气预报数据同步完成，共同步{}个地块", fields.size());
     }
-    
-    // 坐标类，用于存储经纬度
-    private static class Coordinate {
-        private final BigDecimal latitude;
-        private final BigDecimal longitude;
-        
-        public Coordinate(BigDecimal latitude, BigDecimal longitude) {
-            this.latitude = latitude;
-            this.longitude = longitude;
-        }
-        
-        public BigDecimal getLatitude() {
-            return latitude;
-        }
-        
-        public BigDecimal getLongitude() {
-            return longitude;
-        }
-    }
-} 
+}

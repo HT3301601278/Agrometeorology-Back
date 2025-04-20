@@ -66,7 +66,8 @@ public class WeatherServiceImpl implements WeatherService {
         BigDecimal longitude = request.getLongitude();
         
         // 检查数据库中是否有足够新的数据
-        Optional<WeatherCurrent> latestData = currentRepository.findLatestByCoordinates(latitude, longitude);
+        List<WeatherCurrent> latestDataList = currentRepository.findTopByCoordinatesOrderByDtDesc(latitude, longitude);
+        Optional<WeatherCurrent> latestData = latestDataList.isEmpty() ? Optional.empty() : Optional.of(latestDataList.get(0));
         long currentTime = System.currentTimeMillis() / 1000; // 当前时间戳，单位秒
         
         WeatherCurrent weatherData;

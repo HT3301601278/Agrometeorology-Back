@@ -1,6 +1,7 @@
 package org.agro.dto;
 
 import lombok.Data;
+
 import java.math.BigDecimal;
 
 @Data
@@ -24,4 +25,4 @@ public class WeatherHistoricalDTO {
     private String weatherDescription;
     private String weatherIcon;
     private String dtTxt; // 可读的日期时间文本
-} 
+}

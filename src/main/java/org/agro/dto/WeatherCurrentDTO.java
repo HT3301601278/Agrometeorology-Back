@@ -1,6 +1,7 @@
 package org.agro.dto;
 
 import lombok.Data;
+
 import java.math.BigDecimal;
 
 @Data
@@ -26,4 +27,4 @@ public class WeatherCurrentDTO {
     private String locationName;
     private BigDecimal latitude;
     private BigDecimal longitude;
-} 
+}

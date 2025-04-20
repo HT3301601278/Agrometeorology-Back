@@ -1,13 +1,12 @@
 package org.agro.controller;
 
-import org.agro.dto.ResponseResult;
-import org.agro.dto.WeatherCurrentDTO;
-import org.agro.dto.WeatherForecastDTO;
-import org.agro.dto.WeatherHistoricalDTO;
-import org.agro.dto.WeatherRequestDTO;
+import org.agro.dto.*;
 import org.agro.service.WeatherService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -45,4 +44,4 @@ public class WeatherController {
     public ResponseResult<List<WeatherHistoricalDTO>> getHistoricalWeather(@RequestBody WeatherRequestDTO request) {
         return ResponseResult.success(weatherService.getHistoricalWeather(request));
     }
-} 
+}

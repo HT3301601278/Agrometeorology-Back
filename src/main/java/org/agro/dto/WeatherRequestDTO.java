@@ -1,6 +1,7 @@
 package org.agro.dto;
 
 import lombok.Data;
+
 import java.math.BigDecimal;
 
 @Data
@@ -13,4 +14,4 @@ public class WeatherRequestDTO {
     private Integer count; // 获取数据数量
     private String units = "metric"; // 默认使用公制单位(摄氏度)
     private String lang = "zh_cn"; // 默认使用中文
-} 
+}

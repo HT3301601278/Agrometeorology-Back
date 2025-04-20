@@ -11,10 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
-import java.io.IOException;
 
 /**
  * 用户控制器
@@ -63,7 +61,7 @@ public class UserController {
     public ResponseEntity<?> changePassword(@Valid @RequestBody PasswordChangeRequest request) {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         boolean result = userService.changePassword(userDetails.getId(), request);
-        
+
         if (result) {
             return ResponseEntity.ok(ApiResponse.success("密码修改成功", null));
         } else {
@@ -88,7 +86,7 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> toggleUserStatus(@PathVariable Long id) {
         boolean result = userService.toggleUserStatus(id);
-        
+
         if (result) {
             User user = userService.findById(id);
             String status = user.getStatus() ? "已启用" : "已冻结";
@@ -105,11 +103,11 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
         boolean result = userService.deleteUser(id);
-        
+
         if (result) {
             return ResponseEntity.ok(ApiResponse.success("用户删除成功", null));
         } else {
             return ResponseEntity.badRequest().body(ApiResponse.fail("删除失败"));
         }
     }
-} 
+}
