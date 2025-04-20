@@ -21,19 +21,6 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQL8Dialect
-  
-  # 邮件服务配置
-  mail:
-    host: smtp.qq.com
-    port: 587
-    username: 482396642@qq.com
-    password: wgmhkoaqrnrabgja
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
             
   # 文件上传配置
   servlet:

@@ -1,6 +1,7 @@
 package org.agro.service.impl;
 
 import org.agro.service.EmailService;
+import org.agro.service.SystemConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import javax.mail.MessagingException;
 import javax.mail.internet.MimeMessage;
+import java.util.Map;
 
 /**
  * 邮件服务实现类
@@ -21,10 +23,18 @@ public class EmailServiceImpl implements EmailService {
 
     @Autowired
     private JavaMailSender mailSender;
+    
+    @Autowired
+    private SystemConfigService systemConfigService;
 
     @Override
     public void sendSimpleEmail(String to, String subject, String content) {
         SimpleMailMessage message = new SimpleMailMessage();
+        
+        // 设置发件人为配置的邮箱用户名
+        String fromEmail = getFromEmail();
+        message.setFrom(fromEmail);
+        
         message.setTo(to);
         message.setSubject(subject);
         message.setText(content);
@@ -38,6 +48,11 @@ public class EmailServiceImpl implements EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            
+            // 设置发件人为配置的邮箱用户名
+            String fromEmail = getFromEmail();
+            helper.setFrom(fromEmail);
+            
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(content, true);
@@ -61,5 +76,18 @@ public class EmailServiceImpl implements EmailService {
     public void sendNotificationEmail(String to, String title, String content) {
         String subject = "【农业气象监测系统】" + title;
         sendSimpleEmail(to, subject, content);
+    }
+    
+    /**
+     * 获取发件人邮箱
+     */
+    private String getFromEmail() {
+        try {
+            Map<String, String> emailConfig = systemConfigService.getEmailConfig();
+            return emailConfig.getOrDefault("username", "482396642@qq.com");
+        } catch (Exception e) {
+            logger.error("获取发件人邮箱失败，使用默认值: {}", e.getMessage());
+            return "482396642@qq.com";
+        }
     }
 } 
