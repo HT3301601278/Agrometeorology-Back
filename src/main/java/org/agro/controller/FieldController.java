@@ -16,7 +16,7 @@ import java.util.List;
  * 地块控制器
  */
 @RestController
-@RequestMapping("/api/fields")
+@RequestMapping("/fields")
 public class FieldController {
 
     @Autowired
