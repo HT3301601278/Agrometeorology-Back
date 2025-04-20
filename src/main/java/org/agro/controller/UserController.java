@@ -11,8 +11,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
+import java.io.IOException;
 
 /**
  * 用户控制器
@@ -42,6 +44,16 @@ public class UserController {
         UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         User updatedUser = userService.updateUser(userDetails.getId(), updateRequest);
         return ResponseEntity.ok(ApiResponse.success("更新成功", updatedUser));
+    }
+
+    /**
+     * 更新用户头像
+     */
+    @PutMapping("/me/avatar")
+    public ResponseEntity<?> updateAvatar(@RequestParam("avatar") String avatarUrl) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User updatedUser = userService.updateAvatar(userDetails.getId(), avatarUrl);
+        return ResponseEntity.ok(ApiResponse.success("头像更新成功", updatedUser));
     }
 
     /**

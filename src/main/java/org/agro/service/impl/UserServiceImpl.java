@@ -162,6 +162,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    public User updateAvatar(Long userId, String avatarUrl) {
+        User user = findById(userId);
+        user.setAvatar(avatarUrl);
+        return userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
     public boolean changePassword(Long userId, PasswordChangeRequest passwordChangeRequest) {
         User user = findById(userId);
         

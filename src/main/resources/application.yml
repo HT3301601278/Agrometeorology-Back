@@ -34,11 +34,25 @@ spring:
           auth: true
           starttls:
             enable: true
+            
+  # 文件上传配置
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 15MB
 
 # JWT配置
 jwt:
   secret: 45a7sd56asd456as4d65as4d65asd456as4d65as4d65asd456as4d65as4d65asd456as4d65as4d65as4d56sa4d56sa4d
   expirationMs: 86400000
+
+# 文件存储配置
+file:
+  upload:
+    path: uploads
+  access:
+    url: http://localhost:8080/api/uploads/
 
 # 日志配置
 logging:

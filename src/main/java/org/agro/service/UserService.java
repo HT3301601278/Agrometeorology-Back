@@ -43,6 +43,11 @@ public interface UserService {
     User updateUser(Long userId, UserUpdateRequest updateRequest);
 
     /**
+     * 更新用户头像
+     */
+    User updateAvatar(Long userId, String avatarUrl);
+
+    /**
      * 修改密码
      */
     boolean changePassword(Long userId, PasswordChangeRequest passwordChangeRequest);

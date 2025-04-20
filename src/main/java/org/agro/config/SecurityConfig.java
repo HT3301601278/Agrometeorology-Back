@@ -67,6 +67,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .authorizeRequests()
                 .antMatchers("/auth/**").permitAll()
                 .antMatchers("/announcements/public/**").permitAll()
+                .antMatchers("/uploads/**").permitAll()
+                .antMatchers("/files/avatar").permitAll()
                 .anyRequest().authenticated();
 
         // 添加JWT过滤器
