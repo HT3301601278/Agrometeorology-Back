@@ -16,7 +16,7 @@ import java.util.List;
  * 地块组控制器
  */
 @RestController
-@RequestMapping("/api/field-groups")
+@RequestMapping("/field-groups")
 public class FieldGroupController {
 
     @Autowired
