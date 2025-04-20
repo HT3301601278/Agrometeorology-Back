@@ -1,0 +1,48 @@
+# 服务器配置
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+# 数据库配置
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3305/agrometeorology?useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+  
+  # 邮件服务配置
+  mail:
+    host: smtp.example.com
+    port: 587
+    username: 482396642@qq.com
+    password: wgmhkoaqrnrabgja
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# JWT配置
+jwt:
+  secret: your_secret_key_here
+  expirationMs: 86400000
+
+# 日志配置
+logging:
+  level:
+    org:
+      springframework: INFO
+      agro: DEBUG 
