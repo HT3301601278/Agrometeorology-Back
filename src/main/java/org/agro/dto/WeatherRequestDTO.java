@@ -14,4 +14,5 @@ public class WeatherRequestDTO {
     private Integer count; // 获取数据数量
     private String units = "metric"; // 默认使用公制单位(摄氏度)
     private String lang = "zh_cn"; // 默认使用中文
+    private Boolean forceRefresh; // 是否强制刷新数据，绕过缓存
 }

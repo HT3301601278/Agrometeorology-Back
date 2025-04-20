@@ -75,24 +75,94 @@ public class WeatherServiceImpl implements WeatherService {
         BigDecimal latitude = request.getLatitude();
         BigDecimal longitude = request.getLongitude();
         
+        // 添加调试日志，显示请求参数
+        log.debug("getCurrentWeather request: lat={}, lon={}, forceRefresh={}", 
+                latitude, longitude, request.getForceRefresh());
+        
         // 检查数据库中是否有足够新的数据
         List<WeatherCurrent> latestDataList = currentRepository.findTopByCoordinatesOrderByDtDesc(latitude, longitude);
         Optional<WeatherCurrent> latestData = latestDataList.isEmpty() ? Optional.empty() : Optional.of(latestDataList.get(0));
         long currentTime = System.currentTimeMillis() / 1000; // 当前时间戳，单位秒
         
+        if (latestData.isPresent()) {
+            log.debug("Found latest data, dt={}, current time={}, diff={} seconds", 
+                    latestData.get().getDt(), currentTime, (currentTime - latestData.get().getDt()));
+        } else {
+            log.debug("No existing data found for coordinates");
+        }
+        
         WeatherCurrent weatherData;
-        // 使用动态获取的缓存时间
-        if (latestData.isPresent() && (currentTime - latestData.get().getDt() < getMaxAgeCurrentWeather())) {
+        
+        // 检查是否需要强制刷新或缓存是否有效
+        boolean shouldUseCache = latestData.isPresent() && 
+                               (currentTime - latestData.get().getDt() < getMaxAgeCurrentWeather()) &&
+                               (request.getForceRefresh() == null || !request.getForceRefresh());
+        
+        log.debug("Should use cache: {}, cache max age: {} seconds", shouldUseCache, getMaxAgeCurrentWeather());
+        
+        if (shouldUseCache) {
             // 使用数据库中的数据
             weatherData = latestData.get();
-            log.info("Using cached current weather data for lat={}, lon={}, cache time={}min", 
-                    latitude, longitude, systemConfigService.getDataFetchInterval());
+            log.info("Using cached current weather data for lat={}, lon={}, cache time={}min, forceRefresh={}", 
+                    latitude, longitude, systemConfigService.getDataFetchInterval(), request.getForceRefresh());
         } else {
-            // 调用API获取新数据
-            weatherData = fetchCurrentWeatherFromApi(latitude, longitude, request.getUnits(), request.getLang());
-            // 保存到数据库
-            currentRepository.save(weatherData);
-            log.info("Fetched and saved new current weather data for lat={}, lon={}", latitude, longitude);
+            try {
+                // 调用API获取新数据
+                log.debug("Fetching new data from API for lat={}, lon={}", latitude, longitude);
+                weatherData = fetchCurrentWeatherFromApi(latitude, longitude, request.getUnits(), request.getLang());
+                log.debug("API returned data with dt={}", weatherData.getDt());
+                
+                // 首先检查是否已存在相同坐标和时间戳的记录
+                Optional<WeatherCurrent> existingRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
+                        latitude, longitude, weatherData.getDt());
+                
+                if (existingRecord.isPresent()) {
+                    // 如果存在，则更新而不是插入
+                    WeatherCurrent existing = existingRecord.get();
+                    weatherData.setId(existing.getId()); // 保留ID
+                    weatherData.setCreatedAt(existing.getCreatedAt()); // 保留创建时间
+                    log.info("Updating existing weather data for lat={}, lon={}, dt={}", 
+                            latitude, longitude, weatherData.getDt());
+                }
+                
+                // 保存到数据库
+                try {
+                    weatherData = currentRepository.save(weatherData);
+                    log.info("Successfully saved weather data for lat={}, lon={}, dt={}, forceRefresh={}", 
+                            latitude, longitude, weatherData.getDt(), request.getForceRefresh());
+                } catch (Exception e) {
+                    log.error("Failed to save weather data: {}", e.getMessage());
+                    
+                    // 如果是唯一约束冲突，尝试查找并返回已存在的记录
+                    if (e.getMessage() != null && e.getMessage().contains("Duplicate entry") && 
+                            e.getMessage().contains("UKf490mp5tlo8xekcyuag0jy08h")) {
+                        log.warn("Unique constraint violation detected, attempting to find existing record");
+                        Optional<WeatherCurrent> duplicateRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
+                                latitude, longitude, weatherData.getDt());
+                        
+                        if (duplicateRecord.isPresent()) {
+                            weatherData = duplicateRecord.get();
+                            log.info("Using existing record instead of creating new one");
+                        } else {
+                            throw e; // 如果找不到记录，仍然抛出异常
+                        }
+                    } else {
+                        throw e; // 其他类型的异常直接抛出
+                    }
+                }
+            } catch (Exception e) {
+                // 处理可能的API调用异常或数据库操作异常
+                log.error("Error during weather data operation: {}", e.getMessage(), e);
+                
+                // 如果有缓存数据，则回退使用缓存数据
+                if (latestData.isPresent()) {
+                    weatherData = latestData.get();
+                    log.info("Using cached data due to error for lat={}, lon={}", latitude, longitude);
+                } else {
+                    // 如果完全没有数据可用，则抛出异常
+                    throw new RuntimeException("Unable to fetch or retrieve weather data", e);
+                }
+            }
         }
         
         // 转换为DTO
@@ -115,20 +185,20 @@ public class WeatherServiceImpl implements WeatherService {
         if (startTime < currentTime + 4 * 24 * 60 * 60) { // 前4天使用小时级预报
             resultList.addAll(getHourlyForecast(latitude, longitude, 
                     startTime, Math.min(endTime, currentTime + 4 * 24 * 60 * 60), 
-                    request.getUnits(), request.getLang()));
+                    request.getUnits(), request.getLang(), request.getForceRefresh()));
         }
         
         if (endTime > currentTime + 4 * 24 * 60 * 60 && startTime < currentTime + 16 * 24 * 60 * 60) { // 4-16天使用16天预报
             resultList.addAll(getDailyForecast(latitude, longitude, 
                     Math.max(startTime, currentTime + 4 * 24 * 60 * 60), 
                     Math.min(endTime, currentTime + 16 * 24 * 60 * 60),
-                    request.getUnits(), request.getLang()));
+                    request.getUnits(), request.getLang(), request.getForceRefresh()));
         }
         
         if (endTime > currentTime + 16 * 24 * 60 * 60) { // 16-30天使用气候预报
             resultList.addAll(getClimateForecast(latitude, longitude, 
                     Math.max(startTime, currentTime + 16 * 24 * 60 * 60), 
-                    endTime, request.getUnits(), request.getLang()));
+                    endTime, request.getUnits(), request.getLang(), request.getForceRefresh()));
         }
         
         return resultList;
@@ -152,7 +222,10 @@ public class WeatherServiceImpl implements WeatherService {
         
         List<WeatherHistorical> historicalData;
         
-        if (dataCount >= expectedCount * 0.9) { // 如果数据完整度达到90%以上，直接使用数据库数据
+        // 检查是否需要强制刷新或缓存数据是否完整
+        boolean shouldUseCache = dataCount >= expectedCount * 0.9 && (request.getForceRefresh() == null || !request.getForceRefresh());
+        
+        if (shouldUseCache) { // 如果数据完整度达到90%以上且不需要强制刷新，直接使用数据库数据
             historicalData = historicalRepository.findByCoordinatesInTimeRange(latitude, longitude, startTime, endTime);
             log.info("Using {} cached historical weather records for lat={}, lon={}", dataCount, latitude, longitude);
         } else {
@@ -160,7 +233,8 @@ public class WeatherServiceImpl implements WeatherService {
             historicalData = fetchHistoricalWeatherFromApi(latitude, longitude, startTime, endTime, request.getUnits(), request.getLang());
             // 保存到数据库（考虑到可能数据量大，可以优化为批量保存）
             historicalRepository.saveAll(historicalData);
-            log.info("Fetched and saved {} new historical weather records for lat={}, lon={}", historicalData.size(), latitude, longitude);
+            log.info("Fetched and saved {} new historical weather records for lat={}, lon={}, forceRefresh={}", 
+                    historicalData.size(), latitude, longitude, request.getForceRefresh());
         }
         
         // 转换为DTO
@@ -230,7 +304,7 @@ public class WeatherServiceImpl implements WeatherService {
         }
     }
     
-    private List<WeatherForecastDTO> getHourlyForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang) {
+    private List<WeatherForecastDTO> getHourlyForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang, Boolean forceRefresh) {
         // 检查数据库中是否有足够的数据
         long dataCount = forecastRepository.countByCoordinatesAndTypeInTimeRange(
                 latitude, longitude, WeatherForecast.TYPE_HOURLY, startTime, endTime);
@@ -238,7 +312,10 @@ public class WeatherServiceImpl implements WeatherService {
         
         List<WeatherForecast> forecastData;
         
-        if (dataCount >= expectedCount * 0.9) { // 如果数据完整度达到90%以上，直接使用数据库数据
+        // 检查是否需要强制刷新或缓存数据是否完整
+        boolean shouldUseCache = dataCount >= expectedCount * 0.9 && (forceRefresh == null || !forceRefresh);
+        
+        if (shouldUseCache) { // 如果数据完整度达到90%以上且不需要强制刷新，直接使用数据库数据
             forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
                     latitude, longitude, WeatherForecast.TYPE_HOURLY, startTime, endTime);
             log.info("Using {} cached hourly forecast records", dataCount);
@@ -251,7 +328,7 @@ public class WeatherServiceImpl implements WeatherService {
                     .collect(Collectors.toList());
             // 保存到数据库
             forecastRepository.saveAll(forecastData);
-            log.info("Fetched and saved {} new hourly forecast records", forecastData.size());
+            log.info("Fetched and saved {} new hourly forecast records, forceRefresh={}", forecastData.size(), forceRefresh);
         }
         
         // 转换为DTO
@@ -330,13 +407,13 @@ public class WeatherServiceImpl implements WeatherService {
         }
     }
     
-    private List<WeatherForecastDTO> getDailyForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang) {
+    private List<WeatherForecastDTO> getDailyForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang, Boolean forceRefresh) {
         // 实现16天预报的逻辑，与小时级预报类似
         // 为简化代码，这里不再重复实现
         return new ArrayList<>();
     }
     
-    private List<WeatherForecastDTO> getClimateForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang) {
+    private List<WeatherForecastDTO> getClimateForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang, Boolean forceRefresh) {
         // 实现30天气候预报的逻辑，与小时级预报类似
         // 为简化代码，这里不再重复实现
         return new ArrayList<>();
