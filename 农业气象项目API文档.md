@@ -16,10 +16,10 @@
 5. [通知模块](#5-通知模块)
 
 ## 1. 认证模块
-基础URL: `/auth`
+基础URL: `http://localhost:8080/api/auth`
 
 ### 1.1 用户注册
-- **URL**: `/auth/register`
+- **URL**: `http://localhost:8080/api/auth/register`
 - **方法**: POST
 - **描述**: 注册新用户
 - **请求体**:
@@ -56,7 +56,7 @@
   - 使用弱密码注册
 
 ### 1.2 用户登录
-- **URL**: `/auth/login`
+- **URL**: `http://localhost:8080/api/auth/login`
 - **方法**: POST
 - **描述**: 用户登录并获取令牌
 - **请求体**:
@@ -91,7 +91,7 @@
   - 使用被冻结的账户登录
 
 ### 1.3 请求密码重置
-- **URL**: `/auth/password/reset-request`
+- **URL**: `http://localhost:8080/api/auth/password/reset-request`
 - **方法**: POST
 - **描述**: 发送密码重置验证码到用户邮箱
 - **请求参数**:
@@ -109,7 +109,7 @@
   - 为未注册邮箱请求重置密码
 
 ### 1.4 重置密码
-- **URL**: `/auth/password/reset`
+- **URL**: `http://localhost:8080/api/auth/password/reset`
 - **方法**: POST
 - **描述**: 使用验证码重置密码
 - **请求体**:
@@ -135,10 +135,10 @@
   - 设置过于简单的新密码
 
 ## 2. 用户模块
-基础URL: `/users`
+基础URL: `http://localhost:8080/api/users`
 
 ### 2.1 获取当前用户信息
-- **URL**: `/users/me`
+- **URL**: `http://localhost:8080/api/users/me`
 - **方法**: GET
 - **描述**: 获取当前登录用户的详细信息
 - **请求头**: Authorization: Bearer {token}
@@ -164,7 +164,7 @@
   - 不提供令牌请求
 
 ### 2.2 更新用户信息
-- **URL**: `/users/me`
+- **URL**: `http://localhost:8080/api/users/me`
 - **方法**: PUT
 - **描述**: 更新当前登录用户的个人信息
 - **请求头**: Authorization: Bearer {token}
@@ -198,7 +198,7 @@
   - 更新为已存在的邮箱
 
 ### 2.3 修改密码
-- **URL**: `/users/me/password`
+- **URL**: `http://localhost:8080/api/users/me/password`
 - **方法**: PUT
 - **描述**: 修改当前登录用户的密码
 - **请求头**: Authorization: Bearer {token}
@@ -223,7 +223,7 @@
   - 新密码与旧密码相同
 
 ### 2.4 上传用户头像
-- **URL**: `/files/avatar`
+- **URL**: `http://localhost:8080/api/files/avatar`
 - **方法**: POST
 - **描述**: 上传用户头像图片
 - **请求体**: `multipart/form-data`形式
@@ -243,7 +243,7 @@
   - 不提供文件上传
 
 ### 2.5 更新用户头像
-- **URL**: `/users/me/avatar`
+- **URL**: `http://localhost:8080/api/users/me/avatar`
 - **方法**: PUT
 - **描述**: 更新当前用户的头像URL
 - **请求头**: Authorization: Bearer {token}
@@ -272,7 +272,7 @@
   - 未提供授权令牌
 
 ### 2.6 获取用户信息（管理员）
-- **URL**: `/users/{id}`
+- **URL**: `http://localhost:8080/api/users/{id}`
 - **方法**: GET
 - **描述**: 管理员获取指定用户的详细信息
 - **请求头**: Authorization: Bearer {token}
@@ -300,7 +300,7 @@
   - 普通用户尝试访问此接口
 
 ### 2.7 更新用户状态（管理员）
-- **URL**: `/users/{id}/status`
+- **URL**: `http://localhost:8080/api/users/{id}/status`
 - **方法**: PUT
 - **描述**: 管理员冻结或解冻用户账户
 - **请求头**: Authorization: Bearer {token}
@@ -329,7 +329,7 @@
   - 普通用户尝试访问此接口
 
 ### 2.8 删除用户（管理员）
-- **URL**: `/users/{id}`
+- **URL**: `http://localhost:8080/api/users/{id}`
 - **方法**: DELETE
 - **描述**: 管理员删除指定用户
 - **请求头**: Authorization: Bearer {token}
@@ -350,10 +350,10 @@
   - 普通用户尝试访问此接口
 
 ## 3. 管理员模块
-基础URL: `/admin`
+基础URL: `http://localhost:8080/api/admin`
 
 ### 3.1 获取所有用户（分页）
-- **URL**: `/admin/users`
+- **URL**: `http://localhost:8080/api/admin/users`
 - **方法**: GET
 - **描述**: 获取所有用户的列表（分页）
 - **请求头**: Authorization: Bearer {token}
@@ -422,7 +422,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.2 获取所有系统配置（分页）
-- **URL**: `/admin/configs`
+- **URL**: `http://localhost:8080/api/admin/configs`
 - **方法**: GET
 - **描述**: 获取所有系统配置项（分页）
 - **请求头**: Authorization: Bearer {token}
@@ -484,7 +484,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.3 保存系统配置
-- **URL**: `/admin/configs`
+- **URL**: `http://localhost:8080/api/admin/configs`
 - **方法**: POST
 - **描述**: 创建或更新系统配置项
 - **请求头**: Authorization: Bearer {token}
@@ -516,7 +516,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.4 删除系统配置
-- **URL**: `/admin/configs/{key}`
+- **URL**: `http://localhost:8080/api/admin/configs/{key}`
 - **方法**: DELETE
 - **描述**: 删除系统配置项
 - **请求头**: Authorization: Bearer {token}
@@ -536,7 +536,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.5 获取API Key配置
-- **URL**: `/admin/configs/api-key`
+- **URL**: `http://localhost:8080/api/admin/configs/api-key`
 - **方法**: GET
 - **描述**: 获取系统中配置的API Key
 - **请求头**: Authorization: Bearer {token}
@@ -556,7 +556,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.6 保存API Key配置
-- **URL**: `/admin/configs/api-key`
+- **URL**: `http://localhost:8080/api/admin/configs/api-key`
 - **方法**: POST
 - **描述**: 设置或更新系统的API Key
 - **请求头**: Authorization: Bearer {token}
@@ -580,7 +580,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.7 获取数据拉取频率配置
-- **URL**: `/admin/configs/fetch-interval`
+- **URL**: `http://localhost:8080/api/admin/configs/fetch-interval`
 - **方法**: GET
 - **描述**: 获取系统中配置的数据拉取频率（分钟）
 - **请求头**: Authorization: Bearer {token}
@@ -600,7 +600,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.8 保存数据拉取频率配置
-- **URL**: `/admin/configs/fetch-interval`
+- **URL**: `http://localhost:8080/api/admin/configs/fetch-interval`
 - **方法**: POST
 - **描述**: 设置或更新系统的数据拉取频率
 - **请求头**: Authorization: Bearer {token}
@@ -625,7 +625,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.9 获取邮件配置
-- **URL**: `/admin/configs/email`
+- **URL**: `http://localhost:8080/api/admin/configs/email`
 - **方法**: GET
 - **描述**: 获取系统中配置的邮件服务器信息
 - **请求头**: Authorization: Bearer {token}
@@ -650,7 +650,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.10 保存邮件配置
-- **URL**: `/admin/configs/email`
+- **URL**: `http://localhost:8080/api/admin/configs/email`
 - **方法**: POST
 - **描述**: 设置或更新系统的邮件服务器配置
 - **请求头**: Authorization: Bearer {token}
@@ -680,7 +680,7 @@
   - 普通用户尝试访问此接口
 
 ### 3.11 发送系统通知
-- **URL**: `/admin/notifications`
+- **URL**: `http://localhost:8080/api/admin/notifications`
 - **方法**: POST
 - **描述**: 管理员向所有用户发送系统通知
 - **请求头**: Authorization: Bearer {token}
@@ -706,10 +706,10 @@
   - 普通用户尝试访问此接口
 
 ## 4. 公告模块
-基础URL: `/announcements`
+基础URL: `http://localhost:8080/api/announcements`
 
 ### 4.1 获取活动公告
-- **URL**: `/announcements/public`
+- **URL**: `http://localhost:8080/api/announcements/public`
 - **方法**: GET
 - **描述**: 获取所有已发布且未过期的公告
 - **响应**:
@@ -746,7 +746,7 @@
   - 当没有活动公告时的响应
 
 ### 4.2 根据类型获取活动公告
-- **URL**: `/announcements/public/type/{type}`
+- **URL**: `http://localhost:8080/api/announcements/public/type/{type}`
 - **方法**: GET
 - **描述**: 根据类型获取活动公告
 - **路径参数**:
@@ -776,7 +776,7 @@
   - 特定类型没有公告时的响应
 
 ### 4.3 获取公告详情
-- **URL**: `/announcements/public/{id}`
+- **URL**: `http://localhost:8080/api/announcements/public/{id}`
 - **方法**: GET
 - **描述**: 获取公告的详细内容
 - **路径参数**:
@@ -804,7 +804,7 @@
   - 获取已过期公告的详情
 
 ### 4.4 创建公告（管理员）
-- **URL**: `/announcements`
+- **URL**: `http://localhost:8080/api/announcements`
 - **方法**: POST
 - **描述**: 管理员创建新公告
 - **请求头**: Authorization: Bearer {token}
@@ -843,7 +843,7 @@
   - 普通用户尝试创建公告
 
 ### 4.5 更新公告（管理员）
-- **URL**: `/announcements/{id}`
+- **URL**: `http://localhost:8080/api/announcements/{id}`
 - **方法**: PUT
 - **描述**: 管理员更新现有公告
 - **请求头**: Authorization: Bearer {token}
@@ -885,7 +885,7 @@
   - 普通用户尝试更新公告
 
 ### 4.6 发布公告（管理员）
-- **URL**: `/announcements/{id}/publish`
+- **URL**: `http://localhost:8080/api/announcements/{id}/publish`
 - **方法**: PUT
 - **描述**: 管理员将草稿公告发布上线
 - **请求头**: Authorization: Bearer {token}
@@ -915,7 +915,7 @@
   - 普通用户尝试发布公告
 
 ### 4.7 删除公告（管理员）
-- **URL**: `/announcements/{id}`
+- **URL**: `http://localhost:8080/api/announcements/{id}`
 - **方法**: DELETE
 - **描述**: 管理员删除公告
 - **请求头**: Authorization: Bearer {token}
@@ -936,7 +936,7 @@
   - 普通用户尝试删除公告
 
 ### 4.8 获取所有公告（分页，管理员）
-- **URL**: `/announcements`
+- **URL**: `http://localhost:8080/api/announcements`
 - **方法**: GET
 - **描述**: 管理员获取所有公告（包括草稿、已发布、已过期）
 - **请求头**: Authorization: Bearer {token}
@@ -1017,7 +1017,7 @@
   - 普通用户尝试访问此接口
 
 ### 4.9 根据类型获取公告（分页，管理员）
-- **URL**: `/announcements/type/{type}`
+- **URL**: `http://localhost:8080/api/announcements/type/{type}`
 - **方法**: GET
 - **描述**: 管理员根据类型获取公告
 - **请求头**: Authorization: Bearer {token}
@@ -1080,7 +1080,7 @@
   - 普通用户尝试访问此接口
 
 ### 4.10 根据状态获取公告（分页，管理员）
-- **URL**: `/announcements/status/{status}`
+- **URL**: `http://localhost:8080/api/announcements/status/{status}`
 - **方法**: GET
 - **描述**: 管理员根据状态获取公告
 - **请求头**: Authorization: Bearer {token}
@@ -1143,10 +1143,10 @@
   - 普通用户尝试访问此接口
 
 ## 5. 通知模块
-基础URL: `/notifications`
+基础URL: `http://localhost:8080/api/notifications`
 
 ### 5.1 获取当前用户通知（分页）
-- **URL**: `/notifications`
+- **URL**: `http://localhost:8080/api/notifications`
 - **方法**: GET
 - **描述**: 获取当前登录用户的所有通知
 - **请求头**: Authorization: Bearer {token}
@@ -1214,7 +1214,7 @@
   - 未登录用户尝试访问此接口
 
 ### 5.2 获取未读通知
-- **URL**: `/notifications/unread`
+- **URL**: `http://localhost:8080/api/notifications/unread`
 - **方法**: GET
 - **描述**: 获取当前登录用户的所有未读通知
 - **请求头**: Authorization: Bearer {token}
@@ -1245,7 +1245,7 @@
   - 未登录用户尝试访问此接口
 
 ### 5.3 获取未读通知数量
-- **URL**: `/notifications/unread/count`
+- **URL**: `http://localhost:8080/api/notifications/unread/count`
 - **方法**: GET
 - **描述**: 获取当前登录用户的未读通知数量
 - **请求头**: Authorization: Bearer {token}
@@ -1265,7 +1265,7 @@
   - 未登录用户尝试访问此接口
 
 ### 5.4 将通知标记为已读
-- **URL**: `/notifications/{id}/read`
+- **URL**: `http://localhost:8080/api/notifications/{id}/read`
 - **方法**: PUT
 - **描述**: 将指定通知标记为已读
 - **请求头**: Authorization: Bearer {token}
@@ -1287,7 +1287,7 @@
   - 未登录用户尝试访问此接口
 
 ### 5.5 将所有通知标记为已读
-- **URL**: `/notifications/read-all`
+- **URL**: `http://localhost:8080/api/notifications/read-all`
 - **方法**: PUT
 - **描述**: 将当前登录用户的所有未读通知标记为已读
 - **请求头**: Authorization: Bearer {token}
@@ -1305,7 +1305,7 @@
   - 未登录用户尝试访问此接口
 
 ### 5.6 删除通知
-- **URL**: `/notifications/{id}`
+- **URL**: `http://localhost:8080/api/notifications/{id}`
 - **方法**: DELETE
 - **描述**: 删除指定通知
 - **请求头**: Authorization: Bearer {token}
@@ -1327,7 +1327,7 @@
   - 未登录用户尝试访问此接口
 
 ### 5.7 获取通知设置
-- **URL**: `/notifications/settings`
+- **URL**: `http://localhost:8080/api/notifications/settings`
 - **方法**: GET
 - **描述**: 获取当前登录用户的通知设置
 - **请求头**: Authorization: Bearer {token}
@@ -1352,7 +1352,7 @@
   - 未登录用户尝试访问此接口
 
 ### 5.8 更新通知设置
-- **URL**: `/notifications/settings`
+- **URL**: `http://localhost:8080/api/notifications/settings`
 - **方法**: PUT
 - **描述**: 更新当前登录用户的通知设置
 - **请求头**: Authorization: Bearer {token}
