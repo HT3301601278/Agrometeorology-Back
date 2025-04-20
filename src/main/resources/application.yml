@@ -50,7 +50,7 @@ logging:
 
 # OpenWeatherMap API配置
 openweathermap:
-  api-key: YOUR_API_KEY_HERE  # 需要替换为实际的API密钥
+  api-key: 70d450a133448f61ff96d837368aa775  # 需要替换为实际的API密钥
   current-weather-url: https://api.openweathermap.org/data/2.5/weather
   hourly-forecast-url: https://pro.openweathermap.org/data/2.5/forecast/hourly  # 注意：这是专业版API
   daily-forecast-url: https://api.openweathermap.org/data/2.5/forecast/daily

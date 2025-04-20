@@ -75,6 +75,9 @@ public class WeatherForecast {
     @Column(length = 20)
     private String weatherIcon;
     
+    @Column(length = 30)
+    private String dtTxt; // 可读的日期时间文本
+    
     @Column(nullable = false)
     private LocalDateTime createdAt;
     

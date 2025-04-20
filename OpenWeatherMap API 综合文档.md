@@ -324,7 +324,7 @@
     ```
 *   **必需参数**: `lat`, `lon`, `appid`
 *   **可选参数**: `cnt` (返回的时间戳数量), `mode` (json/xml), `units`, `lang`
-*   **示例调用 (7天)**: `...&cnt=63...`
+*   **示例调用 (7天)**: `...&cnt=56...`
 *   **主要响应字段**:
     *   `city`: 城市信息 (id, name, coord, country, population, timezone)
     *   `cod`, `message`, `cnt` (返回的时间戳数量)
