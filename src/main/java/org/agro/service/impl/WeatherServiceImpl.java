@@ -16,10 +16,10 @@ import org.agro.repository.WeatherForecastRepository;
 import org.agro.repository.WeatherHistoricalRepository;
 import org.agro.service.SystemConfigService;
 import org.agro.service.WeatherService;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -190,7 +190,7 @@ public class WeatherServiceImpl implements WeatherService {
 
                             Optional<WeatherCurrent> conflictRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
                                     latitude, longitude, dt);
-                            
+
                             if (conflictRecord.isPresent()) {
                                 weatherData = conflictRecord.get();
                                 log.info("Successfully retrieved existing record at top level after {} retries", i);
@@ -598,7 +598,7 @@ public class WeatherServiceImpl implements WeatherService {
             if (!city.path("sunset").isMissingNode()) {
                 sunset = city.path("sunset").asLong();
             }
-            
+
             JsonNode list = root.path("list");
 
             for (JsonNode item : list) {
@@ -607,7 +607,7 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setLongitude(longitude);
                 forecast.setForecastType(WeatherForecast.TYPE_HOURLY);
                 forecast.setDt(item.path("dt").asLong());
-                
+
                 // 设置日出日落时间
                 forecast.setSunrise(sunrise);
                 forecast.setSunset(sunset);
