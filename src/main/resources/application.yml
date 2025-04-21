@@ -16,10 +16,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         dialect: org.hibernate.dialect.MySQL8Dialect
 
   # 文件上传配置
@@ -45,7 +45,9 @@ file:
 logging:
   level:
     org.agro: DEBUG
-    org.hibernate: INFO
+    org.hibernate: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql: WARN
     org.springframework: INFO
 
 # OpenWeatherMap API配置

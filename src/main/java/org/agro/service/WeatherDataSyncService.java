@@ -68,7 +68,7 @@ public class WeatherDataSyncService implements SchedulingConfigurer {
         List<Field> fields = fieldRepository.findAll();
 
         if (fields.isEmpty()) {
-            log.warn("数据库中没有地块信息，无法同步天气数据");
+            log.warn("数据库中没有地块信息，无需同步天气数据");
             return;
         }
 
