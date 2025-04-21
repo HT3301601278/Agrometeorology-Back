@@ -184,7 +184,7 @@ CREATE TABLE `weather_forecast`  (
   `longitude` decimal(10, 0) NOT NULL COMMENT '经度',
   `dt` bigint(20) NOT NULL COMMENT '预报时间戳',
   `dt_txt` varchar(30) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '预报时间文本',
-  `forecast_type` tinyint(4) NOT NULL COMMENT '预报类型(1小时,2天)',
+  `forecast_type` tinyint(4) NOT NULL COMMENT '预报类型(1:小时级预报,2:16天预报,3:30天气候预报)',
   `sunrise` bigint(20) NULL DEFAULT NULL COMMENT '日出时间',
   `sunset` bigint(20) NULL DEFAULT NULL COMMENT '日落时间',
   `temp` decimal(5, 2) NOT NULL COMMENT '温度',
