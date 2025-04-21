@@ -314,7 +314,7 @@
 	}
 }
 
-### 16天天气预报 API (3小时间隔)
+### 16天天气预报 API (每日12点整)
 
 *   **概述**: 提供最多未来16天的每日天气预报。
 *   **API调用**:
@@ -324,7 +324,7 @@
     ```
 *   **必需参数**: `lat`, `lon`, `appid`
 *   **可选参数**: `cnt` (返回的时间戳数量), `mode` (json/xml), `units`, `lang`
-*   **示例调用 (7天)**: `...&cnt=56...`
+*   **示例调用 (7天)**: `...&cnt=7...`
 *   **主要响应字段**:
     *   `city`: 城市信息 (id, name, coord, country, population, timezone)
     *   `cod`, `message`, `cnt` (返回的时间戳数量)
@@ -347,135 +347,91 @@
 
 返回类似
 {
-	"cod": "200",
-	"message": 0,
-	"cnt": 3,
-	"list": [
-		{
-			"dt": 1744988400,
-			"main": {
-				"temp": 23.95,
-				"feels_like": 23.65,
-				"temp_min": 21.17,
-				"temp_max": 23.95,
-				"pressure": 1005,
-				"sea_level": 1005,
-				"grnd_level": 947,
-				"humidity": 48,
-				"temp_kf": 2.78
-			},
-			"weather": [
-				{
-					"id": 500,
-					"main": "Rain",
-					"description": "小雨",
-					"icon": "10n"
-				}
-			],
-			"clouds": {
-				"all": 11
-			},
-			"wind": {
-				"speed": 0.22,
-				"deg": 294,
-				"gust": 0.62
-			},
-			"visibility": 10000,
-			"pop": 0.5,
-			"rain": {
-				"3h": 0.44
-			},
-			"sys": {
-				"pod": "n"
-			},
-			"dt_txt": "2025-04-18 15:00:00"
-		},
-		{
-			"dt": 1744999200,
-			"main": {
-				"temp": 21.13,
-				"feels_like": 20.81,
-				"temp_min": 19.02,
-				"temp_max": 21.13,
-				"pressure": 1006,
-				"sea_level": 1006,
-				"grnd_level": 946,
-				"humidity": 58,
-				"temp_kf": 2.11
-			},
-			"weather": [
-				{
-					"id": 802,
-					"main": "Clouds",
-					"description": "多云",
-					"icon": "03n"
-				}
-			],
-			"clouds": {
-				"all": 39
-			},
-			"wind": {
-				"speed": 1.71,
-				"deg": 101,
-				"gust": 1.7
-			},
-			"visibility": 10000,
-			"pop": 0.29,
-			"sys": {
-				"pod": "n"
-			},
-			"dt_txt": "2025-04-18 18:00:00"
-		},
-		{
-			"dt": 1745010000,
-			"main": {
-				"temp": 17.67,
-				"feels_like": 17.19,
-				"temp_min": 17.67,
-				"temp_max": 17.67,
-				"pressure": 1008,
-				"sea_level": 1008,
-				"grnd_level": 946,
-				"humidity": 65,
-				"temp_kf": 0
-			},
-			"weather": [
-				{
-					"id": 804,
-					"main": "Clouds",
-					"description": "阴，多云",
-					"icon": "04n"
-				}
-			],
-			"clouds": {
-				"all": 98
-			},
-			"wind": {
-				"speed": 0.84,
-				"deg": 114,
-				"gust": 0.98
-			},
-			"visibility": 10000,
-			"pop": 0,
-			"sys": {
-				"pod": "n"
-			},
-			"dt_txt": "2025-04-18 21:00:00"
-		}
-	],
 	"city": {
 		"id": 1783825,
 		"name": "Zhushan Chengguanzhen",
 		"coord": {
-			"lat": 32.26,
-			"lon": 110.09
+			"lon": 110.09,
+			"lat": 32.26
 		},
 		"country": "CN",
 		"population": 1000,
-		"timezone": 28800,
-		"sunrise": 1744927630,
-		"sunset": 1744974628
-	}
+		"timezone": 28800
+	},
+	"cod": "200",
+	"message": 2.2150885,
+	"cnt": 16,
+	"list": [
+		{
+			"dt": 1745208000,
+			"sunrise": 1745186627,
+			"sunset": 1745233956,
+			"temp": {
+				"day": 25.83,
+				"min": 17.25,
+				"max": 26.58,
+				"night": 17.25,
+				"eve": 18.7,
+				"morn": 17.99
+			},
+			"feels_like": {
+				"day": 26.01,
+				"night": 16.94,
+				"eve": 18.66,
+				"morn": 18.27
+			},
+			"pressure": 1007,
+			"humidity": 59,
+			"weather": [
+				{
+					"id": 501,
+					"main": "Rain",
+					"description": "中雨",
+					"icon": "10d"
+				}
+			],
+			"speed": 5.49,
+			"deg": 356,
+			"gust": 9.45,
+			"clouds": 50,
+			"pop": 1,
+			"rain": 4.32
+		},
+		{
+			"dt": 1746504000,
+			"sunrise": 1746481738,
+			"sunset": 1746530612,
+			"temp": {
+				"day": 22.86,
+				"min": 10,
+				"max": 28.28,
+				"night": 16.72,
+				"eve": 28.28,
+				"morn": 10
+			},
+			"feels_like": {
+				"day": 22.17,
+				"night": 16.25,
+				"eve": 27.46,
+				"morn": 10
+			},
+			"pressure": 1007,
+			"humidity": 37,
+			"weather": [
+				{
+					"id": 800,
+					"main": "Clear",
+					"description": "晴",
+					"icon": "01d"
+				}
+			],
+			"speed": 2.53,
+			"deg": 295,
+			"gust": 3.98,
+			"clouds": 0,
+			"pop": 0
+		}
+	]
 }
 
 ### 30天气候预报 API (每日12点整)

@@ -174,73 +174,57 @@ public class WeatherServiceImpl implements WeatherService {
         BigDecimal latitude = request.getLatitude();
         BigDecimal longitude = request.getLongitude();
         long currentTime = System.currentTimeMillis() / 1000; // 当前时间戳，单位秒
-        
+
         // 计算请求时间范围
         Long startTime = request.getStartTime() != null ? request.getStartTime() : currentTime;
         Long endTime = request.getEndTime() != null ? request.getEndTime() : currentTime + 30 * 24 * 60 * 60; // 默认30天
-        
-        List<WeatherForecastDTO> resultList = new ArrayList<>();
-        
-        // 根据时间范围决定调用哪些预报API
-        if (startTime < currentTime + 4 * 24 * 60 * 60) { // 前4天使用小时级预报
-            resultList.addAll(getHourlyForecast(latitude, longitude, 
-                    startTime, Math.min(endTime, currentTime + 4 * 24 * 60 * 60), 
-                    request.getUnits(), request.getLang(), request.getForceRefresh()));
+
+        // 自动扩展endTime到当天23:00:00（如果endTime为某天0点）
+        LocalDateTime endDateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(endTime), ZoneId.systemDefault());
+        if (endDateTime.getHour() == 0 && endDateTime.getMinute() == 0 && endDateTime.getSecond() == 0) {
+            endTime = endTime + 23 * 3600;
         }
-        
-        if (endTime > currentTime + 4 * 24 * 60 * 60 && startTime < currentTime + 16 * 24 * 60 * 60) { // 4-16天使用16天预报
-            resultList.addAll(getDailyForecast(latitude, longitude, 
-                    Math.max(startTime, currentTime + 4 * 24 * 60 * 60), 
-                    Math.min(endTime, currentTime + 16 * 24 * 60 * 60),
-                    request.getUnits(), request.getLang(), request.getForceRefresh()));
+
+        long secondsInDay = 24 * 60 * 60;
+        long fourDays = currentTime + 4 * secondsInDay;
+        long sixteenDays = currentTime + 16 * secondsInDay;
+        long thirtyDays = currentTime + 30 * secondsInDay;
+
+        if (endTime <= fourDays) {
+            // 全部在0-4天内，用小时级API
+            return getHourlyForecast(latitude, longitude, startTime, endTime, request.getUnits(), request.getLang(), request.getForceRefresh());
+        } else if (endTime <= sixteenDays) {
+            // 覆盖到4-16天，用16天API
+            return getDailyForecast(latitude, longitude, startTime, endTime, request.getUnits(), request.getLang(), request.getForceRefresh());
+        } else {
+            // 覆盖到16-30天，用30天API
+            return getClimateForecast(latitude, longitude, startTime, endTime, request.getUnits(), request.getLang(), request.getForceRefresh());
         }
-        
-        if (endTime > currentTime + 16 * 24 * 60 * 60) { // 16-30天使用气候预报
-            resultList.addAll(getClimateForecast(latitude, longitude, 
-                    Math.max(startTime, currentTime + 16 * 24 * 60 * 60), 
-                    endTime, request.getUnits(), request.getLang(), request.getForceRefresh()));
-        }
-        
-        return resultList;
     }
 
     @Override
     public List<WeatherHistoricalDTO> getHistoricalWeather(WeatherRequestDTO request) {
         BigDecimal latitude = request.getLatitude();
         BigDecimal longitude = request.getLongitude();
-        
         if (request.getStartTime() == null || request.getEndTime() == null) {
             throw new IllegalArgumentException("Historical weather request must include startTime and endTime");
         }
-        
         Long startTime = request.getStartTime();
         Long endTime = request.getEndTime();
-        
-        // 检查数据库中是否有数据
         long dataCount = historicalRepository.countByCoordinatesInTimeRange(latitude, longitude, startTime, endTime);
         int expectedCount = (int) ((endTime - startTime) / 3600) + 1; // 每小时一条数据
-        
         List<WeatherHistorical> historicalData;
-        
-        // 检查是否需要强制刷新或缓存数据是否完整
-        boolean shouldUseCache = dataCount >= expectedCount * 0.9 && (request.getForceRefresh() == null || !request.getForceRefresh());
-        
-        if (shouldUseCache) { // 如果数据完整度达到90%以上且不需要强制刷新，直接使用数据库数据
+        // 100%完成度
+        boolean shouldUseCache = dataCount == expectedCount && (request.getForceRefresh() == null || !request.getForceRefresh());
+        if (shouldUseCache) {
             historicalData = historicalRepository.findByCoordinatesInTimeRange(latitude, longitude, startTime, endTime);
             log.info("Using {} cached historical weather records for lat={}, lon={}", dataCount, latitude, longitude);
         } else {
-            // 调用API获取新数据
             historicalData = fetchHistoricalWeatherFromApi(latitude, longitude, startTime, endTime, request.getUnits(), request.getLang());
-            // 保存到数据库（考虑到可能数据量大，可以优化为批量保存）
             historicalRepository.saveAll(historicalData);
-            log.info("Fetched and saved {} new historical weather records for lat={}, lon={}, forceRefresh={}", 
-                    historicalData.size(), latitude, longitude, request.getForceRefresh());
+            log.info("Fetched and saved {} new historical weather records for lat={}, lon={}, forceRefresh={}", historicalData.size(), latitude, longitude, request.getForceRefresh());
         }
-        
-        // 转换为DTO
-        return historicalData.stream()
-                .map(this::convertToHistoricalDTO)
-                .collect(Collectors.toList());
+        return historicalData.stream().map(this::convertToHistoricalDTO).collect(Collectors.toList());
     }
     
     // 私有辅助方法
@@ -304,37 +288,50 @@ public class WeatherServiceImpl implements WeatherService {
         }
     }
     
+    /**
+     * 批量去重并更新已存在的WeatherForecast数据，避免唯一索引冲突
+     */
+    private List<WeatherForecast> deduplicateAndMergeForecasts(BigDecimal latitude, BigDecimal longitude, byte forecastType, List<WeatherForecast> apiData) {
+        if (apiData == null || apiData.isEmpty()) return apiData;
+        List<Long> dts = apiData.stream().map(WeatherForecast::getDt).collect(Collectors.toList());
+        List<WeatherForecast> existList = forecastRepository.findByCoordinatesAndTypeInTimeRange(
+                latitude, longitude, forecastType,
+                dts.stream().min(Long::compareTo).orElse(0L),
+                dts.stream().max(Long::compareTo).orElse(0L)
+        );
+        // 用dt做key
+        java.util.Map<Long, WeatherForecast> existMap = existList.stream().collect(Collectors.toMap(WeatherForecast::getDt, x -> x));
+        for (WeatherForecast f : apiData) {
+            WeatherForecast exist = existMap.get(f.getDt());
+            if (exist != null) {
+                f.setId(exist.getId());
+                f.setCreatedAt(exist.getCreatedAt());
+            }
+        }
+        return apiData;
+    }
+
     private List<WeatherForecastDTO> getHourlyForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang, Boolean forceRefresh) {
-        // 检查数据库中是否有足够的数据
         long dataCount = forecastRepository.countByCoordinatesAndTypeInTimeRange(
                 latitude, longitude, WeatherForecast.TYPE_HOURLY, startTime, endTime);
         int expectedCount = (int) ((endTime - startTime) / 3600) + 1; // 每小时一条数据
-        
         List<WeatherForecast> forecastData;
-        
-        // 检查是否需要强制刷新或缓存数据是否完整
-        boolean shouldUseCache = dataCount >= expectedCount * 0.9 && (forceRefresh == null || !forceRefresh);
-        
-        if (shouldUseCache) { // 如果数据完整度达到90%以上且不需要强制刷新，直接使用数据库数据
+        // 100%完成度
+        boolean shouldUseCache = dataCount == expectedCount && (forceRefresh == null || !forceRefresh);
+        if (shouldUseCache) {
             forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
                     latitude, longitude, WeatherForecast.TYPE_HOURLY, startTime, endTime);
             log.info("Using {} cached hourly forecast records", dataCount);
         } else {
-            // 调用API获取新数据
             forecastData = fetchHourlyForecastFromApi(latitude, longitude, units, lang);
-            // 过滤所需时间范围
             forecastData = forecastData.stream()
                     .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
                     .collect(Collectors.toList());
-            // 保存到数据库
+            forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_HOURLY, forecastData);
             forecastRepository.saveAll(forecastData);
             log.info("Fetched and saved {} new hourly forecast records, forceRefresh={}", forecastData.size(), forceRefresh);
         }
-        
-        // 转换为DTO
-        return forecastData.stream()
-                .map(this::convertToForecastDTO)
-                .collect(Collectors.toList());
+        return forecastData.stream().map(this::convertToForecastDTO).collect(Collectors.toList());
     }
     
     private List<WeatherForecast> fetchHourlyForecastFromApi(BigDecimal latitude, BigDecimal longitude, String units, String lang) {
@@ -408,15 +405,184 @@ public class WeatherServiceImpl implements WeatherService {
     }
     
     private List<WeatherForecastDTO> getDailyForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang, Boolean forceRefresh) {
-        // 实现16天预报的逻辑，与小时级预报类似
-        // 为简化代码，这里不再重复实现
-        return new ArrayList<>();
+        int days = (int) ((endTime - startTime) / (24 * 60 * 60)) + 1;
+        int cnt = Math.min(days, 16); // 每天一条，最多16天
+        long dataCount = forecastRepository.countByCoordinatesAndTypeInTimeRange(
+                latitude, longitude, WeatherForecast.TYPE_DAILY_16, startTime, endTime);
+        int expectedCount = days; // 每天一条
+        List<WeatherForecast> forecastData;
+        // 100%完成度
+        boolean shouldUseCache = dataCount == expectedCount && (forceRefresh == null || !forceRefresh);
+        if (shouldUseCache) {
+            forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
+                    latitude, longitude, WeatherForecast.TYPE_DAILY_16, startTime, endTime);
+            log.info("Using {} cached 16天 daily forecast records", dataCount);
+        } else {
+            forecastData = fetchDailyForecastFromApi(latitude, longitude, units, lang, cnt);
+            // 过滤出所需时间范围
+            forecastData = forecastData.stream()
+                    .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
+                    .collect(Collectors.toList());
+            forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_DAILY_16, forecastData);
+            forecastRepository.saveAll(forecastData);
+            log.info("Fetched and saved {} new 16天 daily forecast records, forceRefresh={}", forecastData.size(), forceRefresh);
+        }
+        return forecastData.stream().map(this::convertToForecastDTO).collect(Collectors.toList());
     }
-    
+
+    private List<WeatherForecast> fetchDailyForecastFromApi(BigDecimal latitude, BigDecimal longitude, String units, String lang, int cnt) {
+        cnt = Math.min(cnt, 16); // 官方最大16天
+        String url = UriComponentsBuilder.fromHttpUrl(weatherConfig.getDailyForecastUrl())
+                .queryParam("lat", latitude)
+                .queryParam("lon", longitude)
+                .queryParam("units", units)
+                .queryParam("lang", lang)
+                .queryParam("cnt", cnt)
+                .queryParam("appid", weatherConfig.getApiKey())
+                .build()
+                .toUriString();
+        log.info("调用16天API，实际请求URL: {}", url);
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+        List<WeatherForecast> result = new ArrayList<>();
+        try {
+            JsonNode root = objectMapper.readTree(response.getBody());
+            JsonNode list = root.path("list");
+            for (JsonNode item : list) {
+                WeatherForecast forecast = new WeatherForecast();
+                forecast.setLatitude(latitude);
+                forecast.setLongitude(longitude);
+                forecast.setForecastType(WeatherForecast.TYPE_DAILY_16);
+                forecast.setDt(item.path("dt").asLong());
+                
+                // 温度是一个对象，包含不同时间段的温度
+                JsonNode temp = item.path("temp");
+                forecast.setTemp(BigDecimal.valueOf(temp.path("day").asDouble()));      // 白天温度
+                forecast.setTempMin(BigDecimal.valueOf(temp.path("min").asDouble()));   // 最低温度 
+                forecast.setTempMax(BigDecimal.valueOf(temp.path("max").asDouble()));   // 最高温度
+                
+                // 体感温度也是一个对象
+                JsonNode feelsLike = item.path("feels_like");
+                forecast.setFeelsLike(BigDecimal.valueOf(feelsLike.path("day").asDouble())); // 白天体感温度
+                
+                forecast.setPressure(item.path("pressure").asInt());
+                forecast.setHumidity(item.path("humidity").asInt());
+                forecast.setWindSpeed(BigDecimal.valueOf(item.path("speed").asDouble()));
+                forecast.setWindDeg(item.path("deg").asInt());
+                
+                if (item.has("gust")) {
+                    forecast.setWindGust(BigDecimal.valueOf(item.path("gust").asDouble()));
+                }
+                
+                forecast.setCloudsAll(item.path("clouds").asInt());
+                forecast.setPop(item.has("pop") ? BigDecimal.valueOf(item.path("pop").asDouble()) : null);
+                
+                if (item.has("rain")) {
+                    forecast.setRain3h(BigDecimal.valueOf(item.path("rain").asDouble()));
+                }
+                
+                if (item.has("snow")) {
+                    forecast.setSnow3h(BigDecimal.valueOf(item.path("snow").asDouble()));
+                }
+                
+                if (item.path("weather").isArray() && item.path("weather").size() > 0) {
+                    JsonNode weather = item.path("weather").get(0);
+                    forecast.setWeatherId(weather.path("id").asInt());
+                    forecast.setWeatherMain(weather.path("main").asText());
+                    forecast.setWeatherDescription(weather.path("description").asText());
+                    forecast.setWeatherIcon(weather.path("icon").asText());
+                }
+                
+                // 设置可读的日期时间
+                LocalDateTime dateTime = Instant.ofEpochSecond(forecast.getDt())
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDateTime();
+                forecast.setDtTxt(dateTime.format(dtFormatter));
+                
+                result.add(forecast);
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("Error parsing 16天 daily forecast API response: {}", e.getMessage(), e);
+            throw new RuntimeException("Error fetching 16天 daily forecast data", e);
+        }
+    }
+
     private List<WeatherForecastDTO> getClimateForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang, Boolean forceRefresh) {
-        // 实现30天气候预报的逻辑，与小时级预报类似
-        // 为简化代码，这里不再重复实现
-        return new ArrayList<>();
+        int days = (int) ((endTime - startTime) / (24 * 60 * 60)) + 1;
+        int cnt = days; // 每天1个整点
+        long dataCount = forecastRepository.countByCoordinatesAndTypeInTimeRange(
+                latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, startTime, endTime);
+        int expectedCount = days;
+        List<WeatherForecast> forecastData;
+        // 100%完成度
+        boolean shouldUseCache = dataCount == expectedCount && (forceRefresh == null || !forceRefresh);
+        if (shouldUseCache) {
+            forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
+                    latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, startTime, endTime);
+            log.info("Using {} cached 30天 climate forecast records", dataCount);
+        } else {
+            forecastData = fetchClimateForecastFromApi(latitude, longitude, units, lang, cnt);
+            forecastData = forecastData.stream()
+                    .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
+                    .filter(f -> {
+                        LocalDateTime dt = LocalDateTime.ofInstant(Instant.ofEpochSecond(f.getDt()), ZoneId.systemDefault());
+                        return dt.getHour() == 12;
+                    })
+                    .collect(Collectors.toList());
+            forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, forecastData);
+            forecastRepository.saveAll(forecastData);
+            log.info("Fetched and saved {} new 30天 climate forecast records, forceRefresh={}", forecastData.size(), forceRefresh);
+        }
+        return forecastData.stream().map(this::convertToForecastDTO).collect(Collectors.toList());
+    }
+
+    private List<WeatherForecast> fetchClimateForecastFromApi(BigDecimal latitude, BigDecimal longitude, String units, String lang, int cnt) {
+        String url = UriComponentsBuilder.fromHttpUrl(weatherConfig.getClimateForecastUrl())
+                .queryParam("lat", latitude)
+                .queryParam("lon", longitude)
+                .queryParam("units", units)
+                .queryParam("lang", lang)
+                .queryParam("cnt", cnt)
+                .queryParam("appid", weatherConfig.getApiKey())
+                .build()
+                .toUriString();
+        ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+        List<WeatherForecast> result = new ArrayList<>();
+        try {
+            JsonNode root = objectMapper.readTree(response.getBody());
+            JsonNode list = root.path("list");
+            for (JsonNode item : list) {
+                WeatherForecast forecast = new WeatherForecast();
+                forecast.setLatitude(latitude);
+                forecast.setLongitude(longitude);
+                forecast.setForecastType(WeatherForecast.TYPE_CLIMATE_30);
+                forecast.setDt(item.path("dt").asLong());
+                JsonNode temp = item.path("temp");
+                forecast.setTemp(BigDecimal.valueOf(temp.path("day").asDouble()));
+                forecast.setTempMin(BigDecimal.valueOf(temp.path("min").asDouble()));
+                forecast.setTempMax(BigDecimal.valueOf(temp.path("max").asDouble()));
+                forecast.setPressure(item.path("pressure").asInt());
+                forecast.setHumidity(item.path("humidity").asInt());
+                forecast.setWindSpeed(BigDecimal.valueOf(item.path("speed").asDouble()));
+                forecast.setWindDeg(item.path("deg").asInt());
+                forecast.setCloudsAll(item.path("clouds").asInt());
+                forecast.setPop(item.has("pop") ? BigDecimal.valueOf(item.path("pop").asDouble()) : null);
+                if (item.has("rain")) forecast.setRain3h(BigDecimal.valueOf(item.path("rain").asDouble()));
+                if (item.has("snow")) forecast.setSnow3h(BigDecimal.valueOf(item.path("snow").asDouble()));
+                if (item.path("weather").isArray() && item.path("weather").size() > 0) {
+                    JsonNode weather = item.path("weather").get(0);
+                    forecast.setWeatherId(weather.path("id").asInt());
+                    forecast.setWeatherMain(weather.path("main").asText());
+                    forecast.setWeatherDescription(weather.path("description").asText());
+                    forecast.setWeatherIcon(weather.path("icon").asText());
+                }
+                result.add(forecast);
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("Error parsing 30天 climate forecast API response", e);
+            throw new RuntimeException("Error fetching 30天 climate forecast data", e);
+        }
     }
     
     private List<WeatherHistorical> fetchHistoricalWeatherFromApi(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang) {
