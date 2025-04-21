@@ -18,6 +18,8 @@ import org.agro.service.SystemConfigService;
 import org.agro.service.WeatherService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -91,7 +93,8 @@ public class WeatherServiceImpl implements WeatherService {
             log.debug("No existing data found for coordinates");
         }
         
-        WeatherCurrent weatherData;
+        // 初始化weatherData变量
+        WeatherCurrent weatherData = null;
         
         // 检查是否需要强制刷新或缓存是否有效
         boolean shouldUseCache = latestData.isPresent() && 
@@ -112,43 +115,108 @@ public class WeatherServiceImpl implements WeatherService {
                 weatherData = fetchCurrentWeatherFromApi(latitude, longitude, request.getUnits(), request.getLang());
                 log.debug("API returned data with dt={}", weatherData.getDt());
                 
-                // 首先检查是否已存在相同坐标和时间戳的记录
+                // 查询是否已存在相同坐标和时间戳的记录
                 Optional<WeatherCurrent> existingRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
                         latitude, longitude, weatherData.getDt());
                 
                 if (existingRecord.isPresent()) {
-                    // 如果存在，则更新而不是插入
-                    WeatherCurrent existing = existingRecord.get();
-                    weatherData.setId(existing.getId()); // 保留ID
-                    weatherData.setCreatedAt(existing.getCreatedAt()); // 保留创建时间
-                    log.info("Updating existing weather data for lat={}, lon={}, dt={}", 
-                            latitude, longitude, weatherData.getDt());
-                }
-                
-                // 保存到数据库
-                try {
-                    weatherData = currentRepository.save(weatherData);
-                    log.info("Successfully saved weather data for lat={}, lon={}, dt={}, forceRefresh={}", 
-                            latitude, longitude, weatherData.getDt(), request.getForceRefresh());
-                } catch (Exception e) {
-                    log.error("Failed to save weather data: {}", e.getMessage());
-                    
-                    // 如果是唯一约束冲突，尝试查找并返回已存在的记录
-                    if (e.getMessage() != null && e.getMessage().contains("Duplicate entry") && 
-                            e.getMessage().contains("UKf490mp5tlo8xekcyuag0jy08h")) {
-                        log.warn("Unique constraint violation detected, attempting to find existing record");
-                        Optional<WeatherCurrent> duplicateRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
+                    // 如果存在相同时间戳的数据，直接使用已存在的记录
+                    log.info("Found existing weather data with same timestamp, using it instead of inserting new record");
+                    weatherData = existingRecord.get();
+                } else {
+                    try {
+                        // 保存到数据库
+                        weatherData = currentRepository.save(weatherData);
+                        log.info("Successfully saved weather data for lat={}, lon={}, dt={}, forceRefresh={}", 
+                                latitude, longitude, weatherData.getDt(), request.getForceRefresh());
+                    } catch (DataIntegrityViolationException | ConstraintViolationException e) {
+                        // 唯一约束冲突，可能是并发插入导致，尝试重新查询
+                        log.warn("Constraint violation detected when saving weather data: {}", e.getMessage());
+                        
+                        // 延迟一小段时间，确保数据已提交
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                        
+                        // 1. 首先尝试精确查询（相同坐标和时间戳）
+                        Optional<WeatherCurrent> conflictRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
                                 latitude, longitude, weatherData.getDt());
                         
-                        if (duplicateRecord.isPresent()) {
-                            weatherData = duplicateRecord.get();
-                            log.info("Using existing record instead of creating new one");
+                        if (conflictRecord.isPresent()) {
+                            weatherData = conflictRecord.get();
+                            log.info("Successfully retrieved existing record after constraint violation");
                         } else {
-                            throw e; // 如果找不到记录，仍然抛出异常
+                            // 2. 如果精确查询找不到，尝试根据经纬度查找最新记录
+                            List<WeatherCurrent> latestRecords = currentRepository.findTopByCoordinatesOrderByDtDesc(
+                                    latitude, longitude);
+                            if (!latestRecords.isEmpty()) {
+                                weatherData = latestRecords.get(0);
+                                log.info("Using latest available record as fallback after constraint violation, dt={}", weatherData.getDt());
+                            } else if (latestData.isPresent()) {
+                                // 3. 使用查询时的最新记录
+                                weatherData = latestData.get();
+                                log.info("Using initial query result as fallback after constraint violation");
+                            } else {
+                                // 由于我们已经获取了API的数据，直接使用它而不抛出异常
+                                log.warn("Unable to find any existing record after constraint violation, using API data without persisting");
+                                // 不修改weatherData，继续使用API返回的数据
+                            }
                         }
-                    } else {
-                        throw e; // 其他类型的异常直接抛出
+                    } catch (Exception e) {
+                        // 其他类型的异常
+                        log.error("Failed to save weather data: {}", e.getMessage(), e);
+                        if (latestData.isPresent()) {
+                            weatherData = latestData.get();
+                            log.info("Using cached data due to save error");
+                        } else {
+                            // 继续使用API数据
+                            log.warn("Using API data without persisting due to error");
+                        }
                     }
+                }
+            } catch (DataIntegrityViolationException | ConstraintViolationException e) {
+                // 顶层捕获唯一约束冲突
+                log.warn("Constraint violation detected at top level: {}", e.getMessage());
+                
+                Long dt = (weatherData != null) ? weatherData.getDt() : null;
+                
+                if (dt != null) {
+                    // 多次尝试查询
+                    for (int i = 0; i < 3; i++) {
+                        try {
+                            Thread.sleep(100 * (i + 1));  // 递增延迟
+                            
+                            Optional<WeatherCurrent> conflictRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
+                                    latitude, longitude, dt);
+                            
+                            if (conflictRecord.isPresent()) {
+                                weatherData = conflictRecord.get();
+                                log.info("Successfully retrieved existing record at top level after {} retries", i);
+                                break;
+                            }
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                }
+                
+                // 如果重试后仍未找到记录
+                if (weatherData == null || weatherData.getId() == null) {
+                    // 尝试查找最新记录
+                    List<WeatherCurrent> latestRecords = currentRepository.findTopByCoordinatesOrderByDtDesc(
+                            latitude, longitude);
+                    if (!latestRecords.isEmpty()) {
+                        weatherData = latestRecords.get(0);
+                        log.info("Using latest available record as fallback at top level");
+                    } else if (latestData.isPresent()) {
+                        // 回退使用最新缓存数据
+                        weatherData = latestData.get();
+                        log.info("Using cached data as fallback at top level");
+                    }
+                    // 如果所有方法都失败，继续使用API获取的数据
                 }
             } catch (Exception e) {
                 // 处理可能的API调用异常或数据库操作异常
@@ -158,9 +226,10 @@ public class WeatherServiceImpl implements WeatherService {
                 if (latestData.isPresent()) {
                     weatherData = latestData.get();
                     log.info("Using cached data due to error for lat={}, lon={}", latitude, longitude);
-                } else {
-                    // 如果完全没有数据可用，则抛出异常
-                    throw new RuntimeException("Unable to fetch or retrieve weather data", e);
+                }
+                // 否则继续使用API数据（如果已获取）或抛出异常（如果API调用也失败）
+                else if (weatherData == null) {
+                    throw new RuntimeException("Unable to fetch weather data", e);
                 }
             }
         }
