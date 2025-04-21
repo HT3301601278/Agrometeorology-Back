@@ -135,7 +135,7 @@ public class WeatherServiceImpl implements WeatherService {
                         
                         // 延迟一小段时间，确保数据已提交
                         try {
-                            Thread.sleep(200);
+                            Thread.sleep(15);
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
                         }
@@ -422,13 +422,83 @@ public class WeatherServiceImpl implements WeatherService {
                     latitude, longitude, WeatherForecast.TYPE_HOURLY, startTime, endTime);
             log.info("Using {} cached hourly forecast records", dataCount);
         } else {
-            forecastData = fetchHourlyForecastFromApi(latitude, longitude, units, lang);
-            forecastData = forecastData.stream()
-                    .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
-                    .collect(Collectors.toList());
-            forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_HOURLY, forecastData);
-            forecastRepository.saveAll(forecastData);
-            log.info("Fetched and saved {} new hourly forecast records, forceRefresh={}", forecastData.size(), forceRefresh);
+            try {
+                forecastData = fetchHourlyForecastFromApi(latitude, longitude, units, lang);
+                forecastData = forecastData.stream()
+                        .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
+                        .collect(Collectors.toList());
+                forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_HOURLY, forecastData);
+                
+                try {
+                    // 逐个保存，避免批量保存时的唯一约束冲突
+                    List<WeatherForecast> result = new ArrayList<>();
+                    for (WeatherForecast forecast : forecastData) {
+                        try {
+                            // 先检查是否已存在
+                            Optional<WeatherForecast> existing = forecastRepository.findByCoordinatesAndTypeAndDt(
+                                    latitude, longitude, WeatherForecast.TYPE_HOURLY, forecast.getDt());
+                            
+                            if (existing.isPresent()) {
+                                // 如果存在，直接使用现有记录
+                                result.add(existing.get());
+                                log.debug("Using existing hourly forecast record for dt={}", forecast.getDt());
+                            } else {
+                                // 如果不存在，保存新记录
+                                result.add(forecastRepository.save(forecast));
+                                log.debug("Saved new hourly forecast record for dt={}", forecast.getDt());
+                            }
+                        } catch (DataIntegrityViolationException | ConstraintViolationException e) {
+                            // 处理唯一约束冲突
+                            log.warn("Constraint violation when saving hourly forecast for dt={}: {}", 
+                                    forecast.getDt(), e.getMessage());
+                            
+                            try {
+                                Thread.sleep(30);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                            }
+                            
+                            // 尝试查找冲突记录
+                            Optional<WeatherForecast> conflictRecord = forecastRepository.findByCoordinatesAndTypeAndDt(
+                                    latitude, longitude, WeatherForecast.TYPE_HOURLY, forecast.getDt());
+                            
+                            if (conflictRecord.isPresent()) {
+                                result.add(conflictRecord.get());
+                                log.info("Retrieved existing hourly forecast after constraint violation for dt={}", 
+                                        forecast.getDt());
+                            } else {
+                                // 如果找不到，使用原始对象（不含ID）
+                                log.warn("Could not find existing record after constraint violation, using original data for dt={}", 
+                                        forecast.getDt());
+                                result.add(forecast);
+                            }
+                        } catch (Exception e) {
+                            // 其他异常
+                            log.error("Error saving hourly forecast for dt={}: {}", 
+                                    forecast.getDt(), e.getMessage());
+                            result.add(forecast); // 添加原始对象
+                        }
+                    }
+                    forecastData = result;
+                    log.info("Processed {} hourly forecast records with individual save", forecastData.size());
+                } catch (Exception e) {
+                    // 如果整个保存过程失败，记录错误但继续使用API数据
+                    log.error("Failed to save hourly forecast data: {}", e.getMessage(), e);
+                }
+            } catch (Exception e) {
+                // 处理API调用或其他处理错误
+                log.error("Error fetching hourly forecast data: {}", e.getMessage(), e);
+                
+                // 尝试从数据库获取可用数据
+                forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
+                        latitude, longitude, WeatherForecast.TYPE_HOURLY, startTime, endTime);
+                
+                if (forecastData.isEmpty()) {
+                    log.warn("No hourly forecast data available in database, returning empty list");
+                } else {
+                    log.info("Using {} existing hourly forecast records as fallback", forecastData.size());
+                }
+            }
         }
         return forecastData.stream().map(this::convertToForecastDTO).collect(Collectors.toList());
     }
@@ -540,14 +610,84 @@ public class WeatherServiceImpl implements WeatherService {
                     latitude, longitude, WeatherForecast.TYPE_DAILY_16, startTime, endTime);
             log.info("Using {} cached 16天 daily forecast records", dataCount);
         } else {
-            forecastData = fetchDailyForecastFromApi(latitude, longitude, units, lang, cnt);
-            // 过滤出所需时间范围
-            forecastData = forecastData.stream()
-                    .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
-                    .collect(Collectors.toList());
-            forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_DAILY_16, forecastData);
-            forecastRepository.saveAll(forecastData);
-            log.info("Fetched and saved {} new 16天 daily forecast records, forceRefresh={}", forecastData.size(), forceRefresh);
+            try {
+                forecastData = fetchDailyForecastFromApi(latitude, longitude, units, lang, cnt);
+                // 过滤出所需时间范围
+                forecastData = forecastData.stream()
+                        .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
+                        .collect(Collectors.toList());
+                forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_DAILY_16, forecastData);
+                
+                try {
+                    // 逐个保存，避免批量保存时的唯一约束冲突
+                    List<WeatherForecast> result = new ArrayList<>();
+                    for (WeatherForecast forecast : forecastData) {
+                        try {
+                            // 先检查是否已存在
+                            Optional<WeatherForecast> existing = forecastRepository.findByCoordinatesAndTypeAndDt(
+                                    latitude, longitude, WeatherForecast.TYPE_DAILY_16, forecast.getDt());
+                            
+                            if (existing.isPresent()) {
+                                // 如果存在，直接使用现有记录
+                                result.add(existing.get());
+                                log.debug("Using existing daily forecast record for dt={}", forecast.getDt());
+                            } else {
+                                // 如果不存在，保存新记录
+                                result.add(forecastRepository.save(forecast));
+                                log.debug("Saved new daily forecast record for dt={}", forecast.getDt());
+                            }
+                        } catch (DataIntegrityViolationException | ConstraintViolationException e) {
+                            // 处理唯一约束冲突
+                            log.warn("Constraint violation when saving daily forecast for dt={}: {}", 
+                                    forecast.getDt(), e.getMessage());
+                            
+                            try {
+                                Thread.sleep(45);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                            }
+                            
+                            // 尝试查找冲突记录
+                            Optional<WeatherForecast> conflictRecord = forecastRepository.findByCoordinatesAndTypeAndDt(
+                                    latitude, longitude, WeatherForecast.TYPE_DAILY_16, forecast.getDt());
+                            
+                            if (conflictRecord.isPresent()) {
+                                result.add(conflictRecord.get());
+                                log.info("Retrieved existing daily forecast after constraint violation for dt={}", 
+                                        forecast.getDt());
+                            } else {
+                                // 如果找不到，使用原始对象（不含ID）
+                                log.warn("Could not find existing record after constraint violation, using original data for dt={}", 
+                                        forecast.getDt());
+                                result.add(forecast);
+                            }
+                        } catch (Exception e) {
+                            // 其他异常
+                            log.error("Error saving daily forecast for dt={}: {}", 
+                                    forecast.getDt(), e.getMessage());
+                            result.add(forecast); // 添加原始对象
+                        }
+                    }
+                    forecastData = result;
+                    log.info("Processed {} daily forecast records with individual save", forecastData.size());
+                } catch (Exception e) {
+                    // 如果整个保存过程失败，记录错误但继续使用API数据
+                    log.error("Failed to save daily forecast data: {}", e.getMessage(), e);
+                }
+            } catch (Exception e) {
+                // 处理API调用或其他处理错误
+                log.error("Error fetching daily forecast data: {}", e.getMessage(), e);
+                
+                // 尝试从数据库获取可用数据
+                forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
+                        latitude, longitude, WeatherForecast.TYPE_DAILY_16, startTime, endTime);
+                
+                if (forecastData.isEmpty()) {
+                    log.warn("No daily forecast data available in database, returning empty list");
+                } else {
+                    log.info("Using {} existing daily forecast records as fallback", forecastData.size());
+                }
+            }
         }
         return forecastData.stream().map(this::convertToForecastDTO).collect(Collectors.toList());
     }
@@ -653,17 +793,87 @@ public class WeatherServiceImpl implements WeatherService {
                     latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, startTime, endTime);
             log.info("Using {} cached 30天 climate forecast records", dataCount);
         } else {
-            forecastData = fetchClimateForecastFromApi(latitude, longitude, units, lang, cnt);
-            forecastData = forecastData.stream()
-                    .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
-                    .filter(f -> {
-                        LocalDateTime dt = LocalDateTime.ofInstant(Instant.ofEpochSecond(f.getDt()), ZoneId.systemDefault());
-                        return dt.getHour() == 12;
-                    })
-                    .collect(Collectors.toList());
-            forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, forecastData);
-            forecastRepository.saveAll(forecastData);
-            log.info("Fetched and saved {} new 30天 climate forecast records, forceRefresh={}", forecastData.size(), forceRefresh);
+            try {
+                forecastData = fetchClimateForecastFromApi(latitude, longitude, units, lang, cnt);
+                forecastData = forecastData.stream()
+                        .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
+                        .filter(f -> {
+                            LocalDateTime dt = LocalDateTime.ofInstant(Instant.ofEpochSecond(f.getDt()), ZoneId.systemDefault());
+                            return dt.getHour() == 12;
+                        })
+                        .collect(Collectors.toList());
+                forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, forecastData);
+                
+                try {
+                    // 逐个保存，避免批量保存时的唯一约束冲突
+                    List<WeatherForecast> result = new ArrayList<>();
+                    for (WeatherForecast forecast : forecastData) {
+                        try {
+                            // 先检查是否已存在
+                            Optional<WeatherForecast> existing = forecastRepository.findByCoordinatesAndTypeAndDt(
+                                    latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, forecast.getDt());
+                            
+                            if (existing.isPresent()) {
+                                // 如果存在，直接使用现有记录
+                                result.add(existing.get());
+                                log.debug("Using existing climate forecast record for dt={}", forecast.getDt());
+                            } else {
+                                // 如果不存在，保存新记录
+                                result.add(forecastRepository.save(forecast));
+                                log.debug("Saved new climate forecast record for dt={}", forecast.getDt());
+                            }
+                        } catch (DataIntegrityViolationException | ConstraintViolationException e) {
+                            // 处理唯一约束冲突
+                            log.warn("Constraint violation when saving climate forecast for dt={}: {}", 
+                                    forecast.getDt(), e.getMessage());
+                            
+                            try {
+                                Thread.sleep(45);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                            }
+                            
+                            // 尝试查找冲突记录
+                            Optional<WeatherForecast> conflictRecord = forecastRepository.findByCoordinatesAndTypeAndDt(
+                                    latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, forecast.getDt());
+                            
+                            if (conflictRecord.isPresent()) {
+                                result.add(conflictRecord.get());
+                                log.info("Retrieved existing climate forecast after constraint violation for dt={}", 
+                                        forecast.getDt());
+                            } else {
+                                // 如果找不到，使用原始对象（不含ID）
+                                log.warn("Could not find existing record after constraint violation, using original data for dt={}", 
+                                        forecast.getDt());
+                                result.add(forecast);
+                            }
+                        } catch (Exception e) {
+                            // 其他异常
+                            log.error("Error saving climate forecast for dt={}: {}", 
+                                    forecast.getDt(), e.getMessage());
+                            result.add(forecast); // 添加原始对象
+                        }
+                    }
+                    forecastData = result;
+                    log.info("Processed {} climate forecast records with individual save", forecastData.size());
+                } catch (Exception e) {
+                    // 如果整个保存过程失败，记录错误但继续使用API数据
+                    log.error("Failed to save climate forecast data: {}", e.getMessage(), e);
+                }
+            } catch (Exception e) {
+                // 处理API调用或其他处理错误
+                log.error("Error fetching climate forecast data: {}", e.getMessage(), e);
+                
+                // 尝试从数据库获取可用数据
+                forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
+                        latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, startTime, endTime);
+                
+                if (forecastData.isEmpty()) {
+                    log.warn("No climate forecast data available in database, returning empty list");
+                } else {
+                    log.info("Using {} existing climate forecast records as fallback", forecastData.size());
+                }
+            }
         }
         return forecastData.stream().map(this::convertToForecastDTO).collect(Collectors.toList());
     }
