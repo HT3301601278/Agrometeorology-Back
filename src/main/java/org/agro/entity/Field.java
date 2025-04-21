@@ -1,10 +1,10 @@
 package org.agro.entity;
 
-import javax.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import javax.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -46,10 +46,10 @@ public class Field {
     @Column(name = "growth_stage", length = 20)
     private String growthStage;
 
-    @Column(name = "latitude", nullable = false, precision = 10, scale = 6)
+    @Column(name = "latitude", nullable = false, precision = 10)
     private BigDecimal latitude;
 
-    @Column(name = "longitude", nullable = false, precision = 10, scale = 6)
+    @Column(name = "longitude", nullable = false, precision = 10)
     private BigDecimal longitude;
 
     @Column(name = "created_at", nullable = false)
@@ -69,4 +69,4 @@ public class Field {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
-} 
+}

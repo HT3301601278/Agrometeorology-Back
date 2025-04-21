@@ -89,7 +89,8 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public void sendNotificationToAllUsers(String title, String content, Integer type) {
-        List<User> users = userRepository.findAll();
+        // 获取所有角色为USER的用户
+        List<User> users = userRepository.findByRole("USER");
         
         for (User user : users) {
             try {

@@ -11,7 +11,7 @@ spring:
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
-  
+
   # JPA配置
   jpa:
     hibernate:
@@ -21,7 +21,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQL8Dialect
-            
+
   # 文件上传配置
   servlet:
     multipart:
@@ -44,6 +44,14 @@ file:
 # 日志配置
 logging:
   level:
-    org:
-      springframework: INFO
-      agro: DEBUG 
+    org.agro: DEBUG
+    org.hibernate: INFO
+    org.springframework: INFO
+
+# OpenWeatherMap API配置
+openweathermap:
+  current-weather-url: https://api.openweathermap.org/data/2.5/weather
+  hourly-forecast-url: https://pro.openweathermap.org/data/2.5/forecast/hourly
+  daily-forecast-url: https://api.openweathermap.org/data/2.5/forecast/daily
+  climate-forecast-url: https://pro.openweathermap.org/data/2.5/forecast/climate
+  historical-weather-url: https://history.openweathermap.org/data/2.5/history/city

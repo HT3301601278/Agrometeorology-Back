@@ -4,6 +4,7 @@ import org.agro.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -30,4 +31,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 检查邮箱是否存在
      */
     boolean existsByEmail(String email);
+    
+    /**
+     * 统计指定角色的用户数量
+     */
+    long countByRole(String role);
+
+    /**
+     * 查找指定角色的所有用户
+     */
+    List<User> findByRole(String role);
 } 
