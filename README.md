@@ -75,7 +75,7 @@
 
 ### 3.9 文件服务
 *   **头像上传:** 提供用户头像上传接口，返回存储后的文件访问 URL。
-    *   _(注意: 文件存储策略可能需要配置，如本地存储、云存储等)_
+    *   _(注意: 文件存储策略可配置为本地存储，配置文件中已设置上传路径和访问URL)_
 
 ## 4. API 端点
 
@@ -123,9 +123,9 @@
 *   `GET /{id}`: 获取地块分组详情
 
 ### 天气 (`/weather`)
-*   `POST /current`: 获取实时天气 (请求体需包含地点信息)
-*   `POST /forecast`: 获取天气预报 (请求体需包含地点信息)
-*   `POST /historical`: 获取历史天气 (请求体需包含地点信息)
+*   `POST /current`: 获取实时天气 (请求体包含地点信息)
+*   `POST /forecast`: 获取天气预报 (请求体包含地点信息)
+*   `POST /historical`: 获取历史天气 (请求体包含地点信息)
 
 ### 通知 (`/notifications`)
 *   `GET /`: 获取当前用户通知 (分页)
@@ -152,44 +152,49 @@
 ### 文件 (`/files`)
 *   `POST /avatar`: 上传用户头像文件
 
-## 5. 环境准备与部署
+## 5. 环境准备
 
 ### 5.1 前提条件
-*   JDK 11 或更高版本 (请根据 `pom.xml` 或 `build.gradle` 中的配置确认)
-*   Maven 或 Gradle (与项目构建工具一致)
-*   可用的数据库实例 (e.g., MySQL, PostgreSQL)
-*   (可选) 邮件服务器用于发送邮件通知和密码重置
-*   (可选) 外部天气服务 API Key
+*   JDK 11 或更高版本
+*   Maven 3.6 或更高版本
+*   MySQL 8.0 或更高版本
+*   邮件服务器用于发送邮件通知和密码重置
+*   外部天气服务 API Key (如OpenWeatherMap)
 
 ### 5.2 配置
-主要的配置文件是 `src/main/resources/application.properties` (或 `application.yml`)。需要配置以下关键项：
+主要的配置文件是 `src/main/resources/application.yml` 。已配置了以下关键项：
 
 *   **数据库连接:**
-    *   `spring.datasource.url`
-    *   `spring.datasource.username`
-    *   `spring.datasource.password`
-    *   `spring.jpa.hibernate.ddl-auto` (开发环境建议 `update` 或 `validate`, 生产环境建议 `validate` 或 `none`)
+    *   `spring.datasource.url`: jdbc:mysql://localhost:3305/agrometeorology?useSSL=false&serverTimezone=Asia/Shanghai
+    *   `spring.datasource.username`: root
+    *   `spring.datasource.password`: 123456
+    *   `spring.jpa.hibernate.ddl-auto`: update (开发环境)
+
 *   **JWT 配置:**
-    *   `app.jwtSecret` (必须设置一个强随机密钥)
-    *   `app.jwtExpirationMs` (Token 过期时间)
-*   **邮件服务器配置 (如果启用):**
-    *   `spring.mail.host`
-    *   `spring.mail.port`
-    *   `spring.mail.username`
-    *   `spring.mail.password`
-    *   `spring.mail.properties.mail.smtp.auth`
-    *   `spring.mail.properties.mail.smtp.starttls.enable`
-*   **天气 API Key (如果使用外部服务):** 通常在管理员后台配置，或在此处配置默认值。
-*   **文件存储路径 (如果使用本地存储):** 配置头像等文件的本地存储目录。
+    *   `jwt.secret`: (已设置一个安全密钥)
+    *   `jwt.expirationMs`: 86400000 (24小时)
 
-### 5.3 构建与运行
+*   **文件上传配置:**
+    *   `file.upload.path`: uploads (文件上传路径)
+    *   `file.access.url`: http://localhost:8080/api/uploads/ (文件访问URL)
 
-1.  **克隆项目:** `git clone <repository_url>`
-2.  **进入项目目录:** `cd Agrometeorology-Back`
-3.  **配置 `.yml` **
-4.  **构建项目:**
-    *   使用 Maven: `mvn clean package`
-5.  **运行项目:**
-    *   `java -jar target/agrometeorology-back-*.jar` (Maven)
-    *   `java -jar build/libs/agrometeorology-back-*.jar` (Gradle)
-    *   或者通过 IDE 直接运行 `AgrometeorologyApplication.java`
+*   **OpenWeatherMap API配置:**
+    *   已配置相关API端点
+    *   API密钥通过管理员后台配置
+
+*   **日志配置:**
+    *   已配置合适的日志级别
+
+## 6. 启动应用
+
+1. 确保已安装JDK和Maven
+2. 确保MySQL数据库已启动并创建好对应数据库
+3. 克隆或下载项目代码
+4. 进入项目根目录，执行以下命令构建并运行项目:
+
+```bash
+mvn clean install
+mvn spring-boot:run
+```
+
+或者直接使用IDE（如IntelliJ IDEA或Eclipse）导入项目后运行AgrometeorologyApplication类
