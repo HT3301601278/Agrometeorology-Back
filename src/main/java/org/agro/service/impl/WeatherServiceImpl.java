@@ -588,6 +588,17 @@ public class WeatherServiceImpl implements WeatherService {
 
         try {
             JsonNode root = objectMapper.readTree(response.getBody());
+            // 从city下提取日出日落时间
+            JsonNode city = root.path("city");
+            Long sunrise = null;
+            Long sunset = null;
+            if (!city.path("sunrise").isMissingNode()) {
+                sunrise = city.path("sunrise").asLong();
+            }
+            if (!city.path("sunset").isMissingNode()) {
+                sunset = city.path("sunset").asLong();
+            }
+            
             JsonNode list = root.path("list");
 
             for (JsonNode item : list) {
@@ -596,6 +607,10 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setLongitude(longitude);
                 forecast.setForecastType(WeatherForecast.TYPE_HOURLY);
                 forecast.setDt(item.path("dt").asLong());
+                
+                // 设置日出日落时间
+                forecast.setSunrise(sunrise);
+                forecast.setSunset(sunset);
 
                 JsonNode main = item.path("main");
                 forecast.setTemp(BigDecimal.valueOf(main.path("temp").asDouble()));
