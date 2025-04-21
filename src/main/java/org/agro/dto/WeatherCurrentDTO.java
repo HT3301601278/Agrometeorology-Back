@@ -13,6 +13,8 @@ public class WeatherCurrentDTO {
     private BigDecimal tempMax;
     private Integer pressure;
     private Integer humidity;
+    private Integer seaLevel;
+    private Integer grndLevel;
     private BigDecimal windSpeed;
     private Integer windDeg;
     private BigDecimal windGust;
@@ -24,6 +26,11 @@ public class WeatherCurrentDTO {
     private String weatherMain;
     private String weatherDescription;
     private String weatherIcon;
+    private String country;
+    private Long sunrise;
+    private Long sunset;
+    private Integer timezone;
+    private String name;
     private String locationName;
     private BigDecimal latitude;
     private BigDecimal longitude;

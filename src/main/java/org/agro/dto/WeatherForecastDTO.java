@@ -7,6 +7,8 @@ import java.math.BigDecimal;
 @Data
 public class WeatherForecastDTO {
     private Long dt;
+    private Long sunrise;
+    private Long sunset;
     private Byte forecastType;
     private BigDecimal temp;
     private BigDecimal feelsLike;
@@ -20,8 +22,8 @@ public class WeatherForecastDTO {
     private Integer cloudsAll;
     private Integer visibility;
     private BigDecimal pop;
-    private BigDecimal rain3h;
-    private BigDecimal snow3h;
+    private BigDecimal rain1h;
+    private BigDecimal snow1h;
     private Integer weatherId;
     private String weatherMain;
     private String weatherDescription;

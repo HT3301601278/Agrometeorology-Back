@@ -24,6 +24,10 @@ public class WeatherForecast {
 
     @Column(nullable = false)
     private Long dt; // 预报时间戳
+    
+    private Long sunrise; // 日出时间戳
+    
+    private Long sunset; // 日落时间戳
 
     @Column(name = "forecast_type", nullable = false)
     private Byte forecastType; // 1:小时级, 2:16天, 3:30天
@@ -58,12 +62,12 @@ public class WeatherForecast {
 
     @Column(precision = 3, scale = 2)
     private BigDecimal pop; // 降水概率
-
+    
     @Column(precision = 5, scale = 2)
-    private BigDecimal rain3h; // 3小时降雨量
-
+    private BigDecimal rain1h; // 1小时降雨量
+    
     @Column(precision = 5, scale = 2)
-    private BigDecimal snow3h; // 3小时降雪量
+    private BigDecimal snow1h; // 1小时降雪量
 
     private Integer weatherId;
 

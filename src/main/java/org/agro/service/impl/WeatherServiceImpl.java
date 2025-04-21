@@ -254,6 +254,15 @@ public class WeatherServiceImpl implements WeatherService {
             weatherCurrent.setTempMax(BigDecimal.valueOf(root.path("main").path("temp_max").asDouble()));
             weatherCurrent.setPressure(root.path("main").path("pressure").asInt());
             weatherCurrent.setHumidity(root.path("main").path("humidity").asInt());
+            
+            // 添加处理sea_level和grnd_level字段
+            if (!root.path("main").path("sea_level").isMissingNode()) {
+                weatherCurrent.setSeaLevel(root.path("main").path("sea_level").asInt());
+            }
+            if (!root.path("main").path("grnd_level").isMissingNode()) {
+                weatherCurrent.setGrndLevel(root.path("main").path("grnd_level").asInt());
+            }
+            
             weatherCurrent.setWindSpeed(BigDecimal.valueOf(root.path("wind").path("speed").asDouble()));
             weatherCurrent.setWindDeg(root.path("wind").path("deg").asInt());
             
@@ -278,6 +287,27 @@ public class WeatherServiceImpl implements WeatherService {
                 weatherCurrent.setWeatherMain(weather.path("main").asText());
                 weatherCurrent.setWeatherDescription(weather.path("description").asText());
                 weatherCurrent.setWeatherIcon(weather.path("icon").asText());
+            }
+            
+            // 添加处理country, sunrise, sunset, timezone和name字段
+            if (!root.path("sys").isMissingNode()) {
+                if (!root.path("sys").path("country").isMissingNode()) {
+                    weatherCurrent.setCountry(root.path("sys").path("country").asText());
+                }
+                if (!root.path("sys").path("sunrise").isMissingNode()) {
+                    weatherCurrent.setSunrise(root.path("sys").path("sunrise").asLong());
+                }
+                if (!root.path("sys").path("sunset").isMissingNode()) {
+                    weatherCurrent.setSunset(root.path("sys").path("sunset").asLong());
+                }
+            }
+            
+            if (!root.path("timezone").isMissingNode()) {
+                weatherCurrent.setTimezone(root.path("timezone").asInt());
+            }
+            
+            if (!root.path("name").isMissingNode()) {
+                weatherCurrent.setName(root.path("name").asText());
             }
             
             return weatherCurrent;
@@ -377,12 +407,25 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setVisibility(item.path("visibility").asInt());
                 forecast.setPop(BigDecimal.valueOf(item.path("pop").asDouble()));
                 
-                if (!item.path("rain").isMissingNode() && !item.path("rain").path("3h").isMissingNode()) {
-                    forecast.setRain3h(BigDecimal.valueOf(item.path("rain").path("3h").asDouble()));
+                if (!item.path("rain").isMissingNode()) {
+                    // 处理降雨，优先使用1h字段，如果没有则使用3h字段并将值除以3（大致估算）
+                    if (!item.path("rain").path("1h").isMissingNode()) {
+                        forecast.setRain1h(BigDecimal.valueOf(item.path("rain").path("1h").asDouble()));
+                    } else if (!item.path("rain").path("3h").isMissingNode()) {
+                        // 3h降雨量近似转换为1h降雨量（简单除以3）
+                        BigDecimal rain3h = BigDecimal.valueOf(item.path("rain").path("3h").asDouble());
+                        forecast.setRain1h(rain3h.divide(BigDecimal.valueOf(3), 2, BigDecimal.ROUND_HALF_UP));
+                    }
                 }
                 
-                if (!item.path("snow").isMissingNode() && !item.path("snow").path("3h").isMissingNode()) {
-                    forecast.setSnow3h(BigDecimal.valueOf(item.path("snow").path("3h").asDouble()));
+                if (!item.path("snow").isMissingNode()) {
+                    // 处理降雪，逻辑同降雨
+                    if (!item.path("snow").path("1h").isMissingNode()) {
+                        forecast.setSnow1h(BigDecimal.valueOf(item.path("snow").path("1h").asDouble()));
+                    } else if (!item.path("snow").path("3h").isMissingNode()) {
+                        BigDecimal snow3h = BigDecimal.valueOf(item.path("snow").path("3h").asDouble());
+                        forecast.setSnow1h(snow3h.divide(BigDecimal.valueOf(3), 2, BigDecimal.ROUND_HALF_UP));
+                    }
                 }
                 
                 if (item.path("weather").isArray() && item.path("weather").size() > 0) {
@@ -391,6 +434,16 @@ public class WeatherServiceImpl implements WeatherService {
                     forecast.setWeatherMain(weather.path("main").asText());
                     forecast.setWeatherDescription(weather.path("description").asText());
                     forecast.setWeatherIcon(weather.path("icon").asText());
+                }
+                
+                // 设置可读的日期时间
+                if (item.has("dt_txt")) {
+                    forecast.setDtTxt(item.path("dt_txt").asText());
+                } else {
+                    LocalDateTime dateTime = Instant.ofEpochSecond(forecast.getDt())
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDateTime();
+                    forecast.setDtTxt(dateTime.format(dtFormatter));
                 }
                 
                 result.add(forecast);
@@ -454,6 +507,14 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setForecastType(WeatherForecast.TYPE_DAILY_16);
                 forecast.setDt(item.path("dt").asLong());
                 
+                // 添加sunrise和sunset
+                if (!item.path("sunrise").isMissingNode()) {
+                    forecast.setSunrise(item.path("sunrise").asLong());
+                }
+                if (!item.path("sunset").isMissingNode()) {
+                    forecast.setSunset(item.path("sunset").asLong());
+                }
+                
                 // 温度是一个对象，包含不同时间段的温度
                 JsonNode temp = item.path("temp");
                 forecast.setTemp(BigDecimal.valueOf(temp.path("day").asDouble()));      // 白天温度
@@ -477,11 +538,13 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setPop(item.has("pop") ? BigDecimal.valueOf(item.path("pop").asDouble()) : null);
                 
                 if (item.has("rain")) {
-                    forecast.setRain3h(BigDecimal.valueOf(item.path("rain").asDouble()));
+                    // 将daily中的rain值存入rain1h
+                    forecast.setRain1h(BigDecimal.valueOf(item.path("rain").asDouble()));
                 }
                 
                 if (item.has("snow")) {
-                    forecast.setSnow3h(BigDecimal.valueOf(item.path("snow").asDouble()));
+                    // 将daily中的snow值存入snow1h
+                    forecast.setSnow1h(BigDecimal.valueOf(item.path("snow").asDouble()));
                 }
                 
                 if (item.path("weather").isArray() && item.path("weather").size() > 0) {
@@ -557,6 +620,15 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setLongitude(longitude);
                 forecast.setForecastType(WeatherForecast.TYPE_CLIMATE_30);
                 forecast.setDt(item.path("dt").asLong());
+                
+                // 添加sunrise和sunset
+                if (!item.path("sunrise").isMissingNode()) {
+                    forecast.setSunrise(item.path("sunrise").asLong());
+                }
+                if (!item.path("sunset").isMissingNode()) {
+                    forecast.setSunset(item.path("sunset").asLong());
+                }
+                
                 JsonNode temp = item.path("temp");
                 forecast.setTemp(BigDecimal.valueOf(temp.path("day").asDouble()));
                 forecast.setTempMin(BigDecimal.valueOf(temp.path("min").asDouble()));
@@ -567,8 +639,17 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setWindDeg(item.path("deg").asInt());
                 forecast.setCloudsAll(item.path("clouds").asInt());
                 forecast.setPop(item.has("pop") ? BigDecimal.valueOf(item.path("pop").asDouble()) : null);
-                if (item.has("rain")) forecast.setRain3h(BigDecimal.valueOf(item.path("rain").asDouble()));
-                if (item.has("snow")) forecast.setSnow3h(BigDecimal.valueOf(item.path("snow").asDouble()));
+                
+                if (item.has("rain")) {
+                    // 将climate中的rain值存入rain1h
+                    forecast.setRain1h(BigDecimal.valueOf(item.path("rain").asDouble()));
+                }
+                
+                if (item.has("snow")) {
+                    // 将climate中的snow值存入snow1h
+                    forecast.setSnow1h(BigDecimal.valueOf(item.path("snow").asDouble()));
+                }
+                
                 if (item.path("weather").isArray() && item.path("weather").size() > 0) {
                     JsonNode weather = item.path("weather").get(0);
                     forecast.setWeatherId(weather.path("id").asInt());
@@ -576,6 +657,13 @@ public class WeatherServiceImpl implements WeatherService {
                     forecast.setWeatherDescription(weather.path("description").asText());
                     forecast.setWeatherIcon(weather.path("icon").asText());
                 }
+                
+                // 设置可读的日期时间
+                LocalDateTime dateTime = Instant.ofEpochSecond(forecast.getDt())
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDateTime();
+                forecast.setDtTxt(dateTime.format(dtFormatter));
+                
                 result.add(forecast);
             }
             return result;
@@ -667,6 +755,12 @@ public class WeatherServiceImpl implements WeatherService {
         BeanUtils.copyProperties(entity, dto);
         // 设置可读的日期时间
         dto.setDt(entity.getDt());
+        
+        // 如果存在location name，则优先使用name字段，否则使用locationName
+        if (entity.getName() != null && !entity.getName().isEmpty()) {
+            dto.setLocationName(entity.getName());
+        }
+        
         return dto;
     }
     

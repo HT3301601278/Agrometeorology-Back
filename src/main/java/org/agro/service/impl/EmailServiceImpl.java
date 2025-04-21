@@ -33,8 +33,12 @@ public class EmailServiceImpl implements EmailService {
         
         // 设置发件人为配置的邮箱用户名
         String fromEmail = getFromEmail();
-        message.setFrom(fromEmail);
+        if (fromEmail == null) {
+            logger.error("发送简单邮件失败: 未配置发件人邮箱");
+            return;
+        }
         
+        message.setFrom(fromEmail);
         message.setTo(to);
         message.setSubject(subject);
         message.setText(content);
@@ -46,13 +50,17 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public void sendHtmlEmail(String to, String subject, String content) {
         try {
+            // 获取发件人邮箱
+            String fromEmail = getFromEmail();
+            if (fromEmail == null) {
+                logger.error("发送HTML邮件失败: 未配置发件人邮箱");
+                return;
+            }
+            
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             
-            // 设置发件人为配置的邮箱用户名
-            String fromEmail = getFromEmail();
             helper.setFrom(fromEmail);
-            
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(content, true);
@@ -84,10 +92,15 @@ public class EmailServiceImpl implements EmailService {
     private String getFromEmail() {
         try {
             Map<String, String> emailConfig = systemConfigService.getEmailConfig();
-            return emailConfig.getOrDefault("username", "482396642@qq.com");
+            if (emailConfig.containsKey("username")) {
+                return emailConfig.get("username");
+            } else {
+                logger.warn("未找到邮箱用户名配置");
+                return null;
+            }
         } catch (Exception e) {
-            logger.error("获取发件人邮箱失败，使用默认值: {}", e.getMessage());
-            return "482396642@qq.com";
+            logger.error("获取发件人邮箱失败: {}", e.getMessage());
+            return null;
         }
     }
 } 

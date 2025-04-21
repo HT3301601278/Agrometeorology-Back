@@ -40,6 +40,10 @@ public class WeatherCurrent {
     private Integer pressure;
 
     private Integer humidity;
+    
+    private Integer seaLevel;
+    
+    private Integer grndLevel;
 
     @Column(precision = 5, scale = 2)
     private BigDecimal windSpeed;
@@ -69,6 +73,18 @@ public class WeatherCurrent {
 
     @Column(length = 20)
     private String weatherIcon;
+    
+    @Column(length = 2)
+    private String country;
+    
+    private Long sunrise;
+    
+    private Long sunset;
+    
+    private Integer timezone;
+    
+    @Column(length = 100)
+    private String name;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
