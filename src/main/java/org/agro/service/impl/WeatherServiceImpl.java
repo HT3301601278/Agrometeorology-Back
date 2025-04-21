@@ -46,7 +46,7 @@ public class WeatherServiceImpl implements WeatherService {
     private final WeatherForecastRepository forecastRepository;
     private final WeatherHistoricalRepository historicalRepository;
     private final SystemConfigService systemConfigService;
-    
+
     private static final DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Autowired
@@ -64,7 +64,7 @@ public class WeatherServiceImpl implements WeatherService {
         this.systemConfigService = systemConfigService;
         this.objectMapper = new ObjectMapper();
     }
-    
+
     /**
      * 从系统配置中获取数据拉取频率（秒）
      */
@@ -76,37 +76,37 @@ public class WeatherServiceImpl implements WeatherService {
     public WeatherCurrentDTO getCurrentWeather(WeatherRequestDTO request) {
         BigDecimal latitude = request.getLatitude();
         BigDecimal longitude = request.getLongitude();
-        
+
         // 添加调试日志，显示请求参数
-        log.debug("getCurrentWeather request: lat={}, lon={}, forceRefresh={}", 
+        log.debug("getCurrentWeather request: lat={}, lon={}, forceRefresh={}",
                 latitude, longitude, request.getForceRefresh());
-        
+
         // 检查数据库中是否有足够新的数据
         List<WeatherCurrent> latestDataList = currentRepository.findTopByCoordinatesOrderByDtDesc(latitude, longitude);
         Optional<WeatherCurrent> latestData = latestDataList.isEmpty() ? Optional.empty() : Optional.of(latestDataList.get(0));
         long currentTime = System.currentTimeMillis() / 1000; // 当前时间戳，单位秒
-        
+
         if (latestData.isPresent()) {
-            log.debug("Found latest data, dt={}, current time={}, diff={} seconds", 
+            log.debug("Found latest data, dt={}, current time={}, diff={} seconds",
                     latestData.get().getDt(), currentTime, (currentTime - latestData.get().getDt()));
         } else {
             log.debug("No existing data found for coordinates");
         }
-        
+
         // 初始化weatherData变量
         WeatherCurrent weatherData = null;
-        
+
         // 检查是否需要强制刷新或缓存是否有效
-        boolean shouldUseCache = latestData.isPresent() && 
+        boolean shouldUseCache = latestData.isPresent() &&
                                (currentTime - latestData.get().getDt() < getMaxAgeCurrentWeather()) &&
                                (request.getForceRefresh() == null || !request.getForceRefresh());
-        
+
         log.debug("Should use cache: {}, cache max age: {} seconds", shouldUseCache, getMaxAgeCurrentWeather());
-        
+
         if (shouldUseCache) {
             // 使用数据库中的数据
             weatherData = latestData.get();
-            log.info("Using cached current weather data for lat={}, lon={}, cache time={}min, forceRefresh={}", 
+            log.info("Using cached current weather data for lat={}, lon={}, cache time={}min, forceRefresh={}",
                     latitude, longitude, systemConfigService.getDataFetchInterval(), request.getForceRefresh());
         } else {
             try {
@@ -114,11 +114,11 @@ public class WeatherServiceImpl implements WeatherService {
                 log.debug("Fetching new data from API for lat={}, lon={}", latitude, longitude);
                 weatherData = fetchCurrentWeatherFromApi(latitude, longitude, request.getUnits(), request.getLang());
                 log.debug("API returned data with dt={}", weatherData.getDt());
-                
+
                 // 查询是否已存在相同坐标和时间戳的记录
                 Optional<WeatherCurrent> existingRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
                         latitude, longitude, weatherData.getDt());
-                
+
                 if (existingRecord.isPresent()) {
                     // 如果存在相同时间戳的数据，直接使用已存在的记录
                     log.info("Found existing weather data with same timestamp, using it instead of inserting new record");
@@ -127,23 +127,23 @@ public class WeatherServiceImpl implements WeatherService {
                     try {
                         // 保存到数据库
                         weatherData = currentRepository.save(weatherData);
-                        log.info("Successfully saved weather data for lat={}, lon={}, dt={}, forceRefresh={}", 
+                        log.info("Successfully saved weather data for lat={}, lon={}, dt={}, forceRefresh={}",
                                 latitude, longitude, weatherData.getDt(), request.getForceRefresh());
                     } catch (DataIntegrityViolationException | ConstraintViolationException e) {
                         // 唯一约束冲突，可能是并发插入导致，尝试重新查询
                         log.warn("Constraint violation detected when saving weather data: {}", e.getMessage());
-                        
+
                         // 延迟一小段时间，确保数据已提交
                         try {
                             Thread.sleep(15);
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
                         }
-                        
+
                         // 1. 首先尝试精确查询（相同坐标和时间戳）
                         Optional<WeatherCurrent> conflictRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
                                 latitude, longitude, weatherData.getDt());
-                        
+
                         if (conflictRecord.isPresent()) {
                             weatherData = conflictRecord.get();
                             log.info("Successfully retrieved existing record after constraint violation");
@@ -179,15 +179,15 @@ public class WeatherServiceImpl implements WeatherService {
             } catch (DataIntegrityViolationException | ConstraintViolationException e) {
                 // 顶层捕获唯一约束冲突
                 log.warn("Constraint violation detected at top level: {}", e.getMessage());
-                
+
                 Long dt = (weatherData != null) ? weatherData.getDt() : null;
-                
+
                 if (dt != null) {
                     // 多次尝试查询
                     for (int i = 0; i < 3; i++) {
                         try {
-                            Thread.sleep(100 * (i + 1));  // 递增延迟
-                            
+                            Thread.sleep(10 * (i + 1));  // 递增延迟
+
                             Optional<WeatherCurrent> conflictRecord = currentRepository.findByLatitudeAndLongitudeAndDt(
                                     latitude, longitude, dt);
                             
@@ -202,7 +202,7 @@ public class WeatherServiceImpl implements WeatherService {
                         }
                     }
                 }
-                
+
                 // 如果重试后仍未找到记录
                 if (weatherData == null || weatherData.getId() == null) {
                     // 尝试查找最新记录
@@ -221,7 +221,7 @@ public class WeatherServiceImpl implements WeatherService {
             } catch (Exception e) {
                 // 处理可能的API调用异常或数据库操作异常
                 log.error("Error during weather data operation: {}", e.getMessage(), e);
-                
+
                 // 如果有缓存数据，则回退使用缓存数据
                 if (latestData.isPresent()) {
                     weatherData = latestData.get();
@@ -233,7 +233,7 @@ public class WeatherServiceImpl implements WeatherService {
                 }
             }
         }
-        
+
         // 转换为DTO
         return convertToCurrentDTO(weatherData);
     }
@@ -291,7 +291,7 @@ public class WeatherServiceImpl implements WeatherService {
         } else {
             try {
                 historicalData = fetchHistoricalWeatherFromApi(latitude, longitude, startTime, endTime, request.getUnits(), request.getLang());
-                
+
                 try {
                     // 逐个保存，避免批量保存时的唯一约束冲突
                     List<WeatherHistorical> result = new ArrayList<>();
@@ -300,7 +300,7 @@ public class WeatherServiceImpl implements WeatherService {
                             // 先检查是否已存在
                             Optional<WeatherHistorical> existing = historicalRepository.findByCoordinatesAndDt(
                                     latitude, longitude, historical.getDt());
-                            
+
                             if (existing.isPresent()) {
                                 // 如果存在，直接使用现有记录
                                 result.add(existing.get());
@@ -312,32 +312,32 @@ public class WeatherServiceImpl implements WeatherService {
                             }
                         } catch (DataIntegrityViolationException | ConstraintViolationException e) {
                             // 处理唯一约束冲突
-                            log.warn("Constraint violation when saving historical weather for dt={}: {}", 
+                            log.warn("Constraint violation when saving historical weather for dt={}: {}",
                                     historical.getDt(), e.getMessage());
-                            
+
                             try {
                                 Thread.sleep(35); // 使用35ms的延时，介于当前天气和预报天气之间
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                             }
-                            
+
                             // 尝试查找冲突记录
                             Optional<WeatherHistorical> conflictRecord = historicalRepository.findByCoordinatesAndDt(
                                     latitude, longitude, historical.getDt());
-                            
+
                             if (conflictRecord.isPresent()) {
                                 result.add(conflictRecord.get());
-                                log.info("Retrieved existing historical weather after constraint violation for dt={}", 
+                                log.info("Retrieved existing historical weather after constraint violation for dt={}",
                                         historical.getDt());
                             } else {
                                 // 如果找不到，使用原始对象（不含ID）
-                                log.warn("Could not find existing record after constraint violation, using original data for dt={}", 
+                                log.warn("Could not find existing record after constraint violation, using original data for dt={}",
                                         historical.getDt());
                                 result.add(historical);
                             }
                         } catch (Exception e) {
                             // 其他异常
-                            log.error("Error saving historical weather for dt={}: {}", 
+                            log.error("Error saving historical weather for dt={}: {}",
                                     historical.getDt(), e.getMessage());
                             result.add(historical); // 添加原始对象
                         }
@@ -351,11 +351,11 @@ public class WeatherServiceImpl implements WeatherService {
             } catch (Exception e) {
                 // 处理API调用或其他处理错误
                 log.error("Error fetching historical weather data: {}", e.getMessage(), e);
-                
+
                 // 尝试从数据库获取可用数据
                 historicalData = historicalRepository.findByCoordinatesInTimeRange(
                         latitude, longitude, startTime, endTime);
-                
+
                 if (historicalData.isEmpty()) {
                     log.warn("No historical weather data available in database, returning empty list");
                 } else {
@@ -365,7 +365,7 @@ public class WeatherServiceImpl implements WeatherService {
         }
         return historicalData.stream().map(this::convertToHistoricalDTO).collect(Collectors.toList());
     }
-    
+
     // 私有辅助方法
 
     private WeatherCurrent fetchCurrentWeatherFromApi(BigDecimal latitude, BigDecimal longitude, String units, String lang) {
@@ -377,12 +377,12 @@ public class WeatherServiceImpl implements WeatherService {
                 .queryParam("appid", weatherConfig.getApiKey())
                 .build()
                 .toUriString();
-        
+
         ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-        
+
         try {
             JsonNode root = objectMapper.readTree(response.getBody());
-            
+
             WeatherCurrent weatherCurrent = new WeatherCurrent();
             weatherCurrent.setLatitude(latitude);
             weatherCurrent.setLongitude(longitude);
@@ -393,7 +393,7 @@ public class WeatherServiceImpl implements WeatherService {
             weatherCurrent.setTempMax(BigDecimal.valueOf(root.path("main").path("temp_max").asDouble()));
             weatherCurrent.setPressure(root.path("main").path("pressure").asInt());
             weatherCurrent.setHumidity(root.path("main").path("humidity").asInt());
-            
+
             // 添加处理sea_level和grnd_level字段
             if (!root.path("main").path("sea_level").isMissingNode()) {
                 weatherCurrent.setSeaLevel(root.path("main").path("sea_level").asInt());
@@ -401,25 +401,25 @@ public class WeatherServiceImpl implements WeatherService {
             if (!root.path("main").path("grnd_level").isMissingNode()) {
                 weatherCurrent.setGrndLevel(root.path("main").path("grnd_level").asInt());
             }
-            
+
             weatherCurrent.setWindSpeed(BigDecimal.valueOf(root.path("wind").path("speed").asDouble()));
             weatherCurrent.setWindDeg(root.path("wind").path("deg").asInt());
-            
+
             if (!root.path("wind").path("gust").isMissingNode()) {
                 weatherCurrent.setWindGust(BigDecimal.valueOf(root.path("wind").path("gust").asDouble()));
             }
-            
+
             weatherCurrent.setCloudsAll(root.path("clouds").path("all").asInt());
             weatherCurrent.setVisibility(root.path("visibility").asInt());
-            
+
             if (!root.path("rain").isMissingNode() && !root.path("rain").path("1h").isMissingNode()) {
                 weatherCurrent.setRain1h(BigDecimal.valueOf(root.path("rain").path("1h").asDouble()));
             }
-            
+
             if (!root.path("snow").isMissingNode() && !root.path("snow").path("1h").isMissingNode()) {
                 weatherCurrent.setSnow1h(BigDecimal.valueOf(root.path("snow").path("1h").asDouble()));
             }
-            
+
             if (root.path("weather").isArray() && root.path("weather").size() > 0) {
                 JsonNode weather = root.path("weather").get(0);
                 weatherCurrent.setWeatherId(weather.path("id").asInt());
@@ -427,7 +427,7 @@ public class WeatherServiceImpl implements WeatherService {
                 weatherCurrent.setWeatherDescription(weather.path("description").asText());
                 weatherCurrent.setWeatherIcon(weather.path("icon").asText());
             }
-            
+
             // 添加处理country, sunrise, sunset, timezone和name字段
             if (!root.path("sys").isMissingNode()) {
                 if (!root.path("sys").path("country").isMissingNode()) {
@@ -440,23 +440,23 @@ public class WeatherServiceImpl implements WeatherService {
                     weatherCurrent.setSunset(root.path("sys").path("sunset").asLong());
                 }
             }
-            
+
             if (!root.path("timezone").isMissingNode()) {
                 weatherCurrent.setTimezone(root.path("timezone").asInt());
             }
-            
+
             if (!root.path("name").isMissingNode()) {
                 weatherCurrent.setName(root.path("name").asText());
             }
-            
+
             return weatherCurrent;
-            
+
         } catch (Exception e) {
             log.error("Error parsing current weather API response", e);
             throw new RuntimeException("Error fetching current weather data", e);
         }
     }
-    
+
     /**
      * 批量去重并更新已存在的WeatherForecast数据，避免唯一索引冲突
      */
@@ -498,7 +498,7 @@ public class WeatherServiceImpl implements WeatherService {
                         .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
                         .collect(Collectors.toList());
                 forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_HOURLY, forecastData);
-                
+
                 try {
                     // 逐个保存，避免批量保存时的唯一约束冲突
                     List<WeatherForecast> result = new ArrayList<>();
@@ -507,7 +507,7 @@ public class WeatherServiceImpl implements WeatherService {
                             // 先检查是否已存在
                             Optional<WeatherForecast> existing = forecastRepository.findByCoordinatesAndTypeAndDt(
                                     latitude, longitude, WeatherForecast.TYPE_HOURLY, forecast.getDt());
-                            
+
                             if (existing.isPresent()) {
                                 // 如果存在，直接使用现有记录
                                 result.add(existing.get());
@@ -519,32 +519,32 @@ public class WeatherServiceImpl implements WeatherService {
                             }
                         } catch (DataIntegrityViolationException | ConstraintViolationException e) {
                             // 处理唯一约束冲突
-                            log.warn("Constraint violation when saving hourly forecast for dt={}: {}", 
+                            log.warn("Constraint violation when saving hourly forecast for dt={}: {}",
                                     forecast.getDt(), e.getMessage());
-                            
+
                             try {
                                 Thread.sleep(30);
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                             }
-                            
+
                             // 尝试查找冲突记录
                             Optional<WeatherForecast> conflictRecord = forecastRepository.findByCoordinatesAndTypeAndDt(
                                     latitude, longitude, WeatherForecast.TYPE_HOURLY, forecast.getDt());
-                            
+
                             if (conflictRecord.isPresent()) {
                                 result.add(conflictRecord.get());
-                                log.info("Retrieved existing hourly forecast after constraint violation for dt={}", 
+                                log.info("Retrieved existing hourly forecast after constraint violation for dt={}",
                                         forecast.getDt());
                             } else {
                                 // 如果找不到，使用原始对象（不含ID）
-                                log.warn("Could not find existing record after constraint violation, using original data for dt={}", 
+                                log.warn("Could not find existing record after constraint violation, using original data for dt={}",
                                         forecast.getDt());
                                 result.add(forecast);
                             }
                         } catch (Exception e) {
                             // 其他异常
-                            log.error("Error saving hourly forecast for dt={}: {}", 
+                            log.error("Error saving hourly forecast for dt={}: {}",
                                     forecast.getDt(), e.getMessage());
                             result.add(forecast); // 添加原始对象
                         }
@@ -558,11 +558,11 @@ public class WeatherServiceImpl implements WeatherService {
             } catch (Exception e) {
                 // 处理API调用或其他处理错误
                 log.error("Error fetching hourly forecast data: {}", e.getMessage(), e);
-                
+
                 // 尝试从数据库获取可用数据
                 forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
                         latitude, longitude, WeatherForecast.TYPE_HOURLY, startTime, endTime);
-                
+
                 if (forecastData.isEmpty()) {
                     log.warn("No hourly forecast data available in database, returning empty list");
                 } else {
@@ -572,7 +572,7 @@ public class WeatherServiceImpl implements WeatherService {
         }
         return forecastData.stream().map(this::convertToForecastDTO).collect(Collectors.toList());
     }
-    
+
     private List<WeatherForecast> fetchHourlyForecastFromApi(BigDecimal latitude, BigDecimal longitude, String units, String lang) {
         String url = UriComponentsBuilder.fromHttpUrl(weatherConfig.getHourlyForecastUrl())
                 .queryParam("lat", latitude)
@@ -582,21 +582,21 @@ public class WeatherServiceImpl implements WeatherService {
                 .queryParam("appid", weatherConfig.getApiKey())
                 .build()
                 .toUriString();
-        
+
         ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
         List<WeatherForecast> result = new ArrayList<>();
-        
+
         try {
             JsonNode root = objectMapper.readTree(response.getBody());
             JsonNode list = root.path("list");
-            
+
             for (JsonNode item : list) {
                 WeatherForecast forecast = new WeatherForecast();
                 forecast.setLatitude(latitude);
                 forecast.setLongitude(longitude);
                 forecast.setForecastType(WeatherForecast.TYPE_HOURLY);
                 forecast.setDt(item.path("dt").asLong());
-                
+
                 JsonNode main = item.path("main");
                 forecast.setTemp(BigDecimal.valueOf(main.path("temp").asDouble()));
                 forecast.setFeelsLike(BigDecimal.valueOf(main.path("feels_like").asDouble()));
@@ -604,18 +604,18 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setTempMax(BigDecimal.valueOf(main.path("temp_max").asDouble()));
                 forecast.setPressure(main.path("pressure").asInt());
                 forecast.setHumidity(main.path("humidity").asInt());
-                
+
                 JsonNode wind = item.path("wind");
                 forecast.setWindSpeed(BigDecimal.valueOf(wind.path("speed").asDouble()));
                 forecast.setWindDeg(wind.path("deg").asInt());
                 if (!wind.path("gust").isMissingNode()) {
                     forecast.setWindGust(BigDecimal.valueOf(wind.path("gust").asDouble()));
                 }
-                
+
                 forecast.setCloudsAll(item.path("clouds").path("all").asInt());
                 forecast.setVisibility(item.path("visibility").asInt());
                 forecast.setPop(BigDecimal.valueOf(item.path("pop").asDouble()));
-                
+
                 if (!item.path("rain").isMissingNode()) {
                     // 处理降雨，优先使用1h字段，如果没有则使用3h字段并将值除以3（大致估算）
                     if (!item.path("rain").path("1h").isMissingNode()) {
@@ -626,7 +626,7 @@ public class WeatherServiceImpl implements WeatherService {
                         forecast.setRain1h(rain3h.divide(BigDecimal.valueOf(3), 2, BigDecimal.ROUND_HALF_UP));
                     }
                 }
-                
+
                 if (!item.path("snow").isMissingNode()) {
                     // 处理降雪，逻辑同降雨
                     if (!item.path("snow").path("1h").isMissingNode()) {
@@ -636,7 +636,7 @@ public class WeatherServiceImpl implements WeatherService {
                         forecast.setSnow1h(snow3h.divide(BigDecimal.valueOf(3), 2, BigDecimal.ROUND_HALF_UP));
                     }
                 }
-                
+
                 if (item.path("weather").isArray() && item.path("weather").size() > 0) {
                     JsonNode weather = item.path("weather").get(0);
                     forecast.setWeatherId(weather.path("id").asInt());
@@ -644,7 +644,7 @@ public class WeatherServiceImpl implements WeatherService {
                     forecast.setWeatherDescription(weather.path("description").asText());
                     forecast.setWeatherIcon(weather.path("icon").asText());
                 }
-                
+
                 // 设置可读的日期时间
                 if (item.has("dt_txt")) {
                     forecast.setDtTxt(item.path("dt_txt").asText());
@@ -654,18 +654,18 @@ public class WeatherServiceImpl implements WeatherService {
                             .toLocalDateTime();
                     forecast.setDtTxt(dateTime.format(dtFormatter));
                 }
-                
+
                 result.add(forecast);
             }
-            
+
             return result;
-            
+
         } catch (Exception e) {
             log.error("Error parsing hourly forecast API response", e);
             throw new RuntimeException("Error fetching hourly forecast data", e);
         }
     }
-    
+
     private List<WeatherForecastDTO> getDailyForecast(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang, Boolean forceRefresh) {
         int days = (int) ((endTime - startTime) / (24 * 60 * 60)) + 1;
         int cnt = Math.min(days, 16); // 每天一条，最多16天
@@ -687,7 +687,7 @@ public class WeatherServiceImpl implements WeatherService {
                         .filter(f -> f.getDt() >= startTime && f.getDt() <= endTime)
                         .collect(Collectors.toList());
                 forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_DAILY_16, forecastData);
-                
+
                 try {
                     // 逐个保存，避免批量保存时的唯一约束冲突
                     List<WeatherForecast> result = new ArrayList<>();
@@ -696,7 +696,7 @@ public class WeatherServiceImpl implements WeatherService {
                             // 先检查是否已存在
                             Optional<WeatherForecast> existing = forecastRepository.findByCoordinatesAndTypeAndDt(
                                     latitude, longitude, WeatherForecast.TYPE_DAILY_16, forecast.getDt());
-                            
+
                             if (existing.isPresent()) {
                                 // 如果存在，直接使用现有记录
                                 result.add(existing.get());
@@ -708,32 +708,32 @@ public class WeatherServiceImpl implements WeatherService {
                             }
                         } catch (DataIntegrityViolationException | ConstraintViolationException e) {
                             // 处理唯一约束冲突
-                            log.warn("Constraint violation when saving daily forecast for dt={}: {}", 
+                            log.warn("Constraint violation when saving daily forecast for dt={}: {}",
                                     forecast.getDt(), e.getMessage());
-                            
+
                             try {
                                 Thread.sleep(45);
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                             }
-                            
+
                             // 尝试查找冲突记录
                             Optional<WeatherForecast> conflictRecord = forecastRepository.findByCoordinatesAndTypeAndDt(
                                     latitude, longitude, WeatherForecast.TYPE_DAILY_16, forecast.getDt());
-                            
+
                             if (conflictRecord.isPresent()) {
                                 result.add(conflictRecord.get());
-                                log.info("Retrieved existing daily forecast after constraint violation for dt={}", 
+                                log.info("Retrieved existing daily forecast after constraint violation for dt={}",
                                         forecast.getDt());
                             } else {
                                 // 如果找不到，使用原始对象（不含ID）
-                                log.warn("Could not find existing record after constraint violation, using original data for dt={}", 
+                                log.warn("Could not find existing record after constraint violation, using original data for dt={}",
                                         forecast.getDt());
                                 result.add(forecast);
                             }
                         } catch (Exception e) {
                             // 其他异常
-                            log.error("Error saving daily forecast for dt={}: {}", 
+                            log.error("Error saving daily forecast for dt={}: {}",
                                     forecast.getDt(), e.getMessage());
                             result.add(forecast); // 添加原始对象
                         }
@@ -747,11 +747,11 @@ public class WeatherServiceImpl implements WeatherService {
             } catch (Exception e) {
                 // 处理API调用或其他处理错误
                 log.error("Error fetching daily forecast data: {}", e.getMessage(), e);
-                
+
                 // 尝试从数据库获取可用数据
                 forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
                         latitude, longitude, WeatherForecast.TYPE_DAILY_16, startTime, endTime);
-                
+
                 if (forecastData.isEmpty()) {
                     log.warn("No daily forecast data available in database, returning empty list");
                 } else {
@@ -785,7 +785,7 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setLongitude(longitude);
                 forecast.setForecastType(WeatherForecast.TYPE_DAILY_16);
                 forecast.setDt(item.path("dt").asLong());
-                
+
                 // 添加sunrise和sunset
                 if (!item.path("sunrise").isMissingNode()) {
                     forecast.setSunrise(item.path("sunrise").asLong());
@@ -793,39 +793,39 @@ public class WeatherServiceImpl implements WeatherService {
                 if (!item.path("sunset").isMissingNode()) {
                     forecast.setSunset(item.path("sunset").asLong());
                 }
-                
+
                 // 温度是一个对象，包含不同时间段的温度
                 JsonNode temp = item.path("temp");
                 forecast.setTemp(BigDecimal.valueOf(temp.path("day").asDouble()));      // 白天温度
-                forecast.setTempMin(BigDecimal.valueOf(temp.path("min").asDouble()));   // 最低温度 
+                forecast.setTempMin(BigDecimal.valueOf(temp.path("min").asDouble()));   // 最低温度
                 forecast.setTempMax(BigDecimal.valueOf(temp.path("max").asDouble()));   // 最高温度
-                
+
                 // 体感温度也是一个对象
                 JsonNode feelsLike = item.path("feels_like");
                 forecast.setFeelsLike(BigDecimal.valueOf(feelsLike.path("day").asDouble())); // 白天体感温度
-                
+
                 forecast.setPressure(item.path("pressure").asInt());
                 forecast.setHumidity(item.path("humidity").asInt());
                 forecast.setWindSpeed(BigDecimal.valueOf(item.path("speed").asDouble()));
                 forecast.setWindDeg(item.path("deg").asInt());
-                
+
                 if (item.has("gust")) {
                     forecast.setWindGust(BigDecimal.valueOf(item.path("gust").asDouble()));
                 }
-                
+
                 forecast.setCloudsAll(item.path("clouds").asInt());
                 forecast.setPop(item.has("pop") ? BigDecimal.valueOf(item.path("pop").asDouble()) : null);
-                
+
                 if (item.has("rain")) {
                     // 将daily中的rain值存入rain1h
                     forecast.setRain1h(BigDecimal.valueOf(item.path("rain").asDouble()));
                 }
-                
+
                 if (item.has("snow")) {
                     // 将daily中的snow值存入snow1h
                     forecast.setSnow1h(BigDecimal.valueOf(item.path("snow").asDouble()));
                 }
-                
+
                 if (item.path("weather").isArray() && item.path("weather").size() > 0) {
                     JsonNode weather = item.path("weather").get(0);
                     forecast.setWeatherId(weather.path("id").asInt());
@@ -833,13 +833,13 @@ public class WeatherServiceImpl implements WeatherService {
                     forecast.setWeatherDescription(weather.path("description").asText());
                     forecast.setWeatherIcon(weather.path("icon").asText());
                 }
-                
+
                 // 设置可读的日期时间
                 LocalDateTime dateTime = Instant.ofEpochSecond(forecast.getDt())
                         .atZone(ZoneId.systemDefault())
                         .toLocalDateTime();
                 forecast.setDtTxt(dateTime.format(dtFormatter));
-                
+
                 result.add(forecast);
             }
             return result;
@@ -873,7 +873,7 @@ public class WeatherServiceImpl implements WeatherService {
                         })
                         .collect(Collectors.toList());
                 forecastData = deduplicateAndMergeForecasts(latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, forecastData);
-                
+
                 try {
                     // 逐个保存，避免批量保存时的唯一约束冲突
                     List<WeatherForecast> result = new ArrayList<>();
@@ -882,7 +882,7 @@ public class WeatherServiceImpl implements WeatherService {
                             // 先检查是否已存在
                             Optional<WeatherForecast> existing = forecastRepository.findByCoordinatesAndTypeAndDt(
                                     latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, forecast.getDt());
-                            
+
                             if (existing.isPresent()) {
                                 // 如果存在，直接使用现有记录
                                 result.add(existing.get());
@@ -894,32 +894,32 @@ public class WeatherServiceImpl implements WeatherService {
                             }
                         } catch (DataIntegrityViolationException | ConstraintViolationException e) {
                             // 处理唯一约束冲突
-                            log.warn("Constraint violation when saving climate forecast for dt={}: {}", 
+                            log.warn("Constraint violation when saving climate forecast for dt={}: {}",
                                     forecast.getDt(), e.getMessage());
-                            
+
                             try {
                                 Thread.sleep(45);
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                             }
-                            
+
                             // 尝试查找冲突记录
                             Optional<WeatherForecast> conflictRecord = forecastRepository.findByCoordinatesAndTypeAndDt(
                                     latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, forecast.getDt());
-                            
+
                             if (conflictRecord.isPresent()) {
                                 result.add(conflictRecord.get());
-                                log.info("Retrieved existing climate forecast after constraint violation for dt={}", 
+                                log.info("Retrieved existing climate forecast after constraint violation for dt={}",
                                         forecast.getDt());
                             } else {
                                 // 如果找不到，使用原始对象（不含ID）
-                                log.warn("Could not find existing record after constraint violation, using original data for dt={}", 
+                                log.warn("Could not find existing record after constraint violation, using original data for dt={}",
                                         forecast.getDt());
                                 result.add(forecast);
                             }
                         } catch (Exception e) {
                             // 其他异常
-                            log.error("Error saving climate forecast for dt={}: {}", 
+                            log.error("Error saving climate forecast for dt={}: {}",
                                     forecast.getDt(), e.getMessage());
                             result.add(forecast); // 添加原始对象
                         }
@@ -933,11 +933,11 @@ public class WeatherServiceImpl implements WeatherService {
             } catch (Exception e) {
                 // 处理API调用或其他处理错误
                 log.error("Error fetching climate forecast data: {}", e.getMessage(), e);
-                
+
                 // 尝试从数据库获取可用数据
                 forecastData = forecastRepository.findByCoordinatesAndTypeInTimeRange(
                         latitude, longitude, WeatherForecast.TYPE_CLIMATE_30, startTime, endTime);
-                
+
                 if (forecastData.isEmpty()) {
                     log.warn("No climate forecast data available in database, returning empty list");
                 } else {
@@ -969,7 +969,7 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setLongitude(longitude);
                 forecast.setForecastType(WeatherForecast.TYPE_CLIMATE_30);
                 forecast.setDt(item.path("dt").asLong());
-                
+
                 // 添加sunrise和sunset
                 if (!item.path("sunrise").isMissingNode()) {
                     forecast.setSunrise(item.path("sunrise").asLong());
@@ -977,7 +977,7 @@ public class WeatherServiceImpl implements WeatherService {
                 if (!item.path("sunset").isMissingNode()) {
                     forecast.setSunset(item.path("sunset").asLong());
                 }
-                
+
                 JsonNode temp = item.path("temp");
                 forecast.setTemp(BigDecimal.valueOf(temp.path("day").asDouble()));
                 forecast.setTempMin(BigDecimal.valueOf(temp.path("min").asDouble()));
@@ -988,17 +988,17 @@ public class WeatherServiceImpl implements WeatherService {
                 forecast.setWindDeg(item.path("deg").asInt());
                 forecast.setCloudsAll(item.path("clouds").asInt());
                 forecast.setPop(item.has("pop") ? BigDecimal.valueOf(item.path("pop").asDouble()) : null);
-                
+
                 if (item.has("rain")) {
                     // 将climate中的rain值存入rain1h
                     forecast.setRain1h(BigDecimal.valueOf(item.path("rain").asDouble()));
                 }
-                
+
                 if (item.has("snow")) {
                     // 将climate中的snow值存入snow1h
                     forecast.setSnow1h(BigDecimal.valueOf(item.path("snow").asDouble()));
                 }
-                
+
                 if (item.path("weather").isArray() && item.path("weather").size() > 0) {
                     JsonNode weather = item.path("weather").get(0);
                     forecast.setWeatherId(weather.path("id").asInt());
@@ -1006,13 +1006,13 @@ public class WeatherServiceImpl implements WeatherService {
                     forecast.setWeatherDescription(weather.path("description").asText());
                     forecast.setWeatherIcon(weather.path("icon").asText());
                 }
-                
+
                 // 设置可读的日期时间
                 LocalDateTime dateTime = Instant.ofEpochSecond(forecast.getDt())
                         .atZone(ZoneId.systemDefault())
                         .toLocalDateTime();
                 forecast.setDtTxt(dateTime.format(dtFormatter));
-                
+
                 result.add(forecast);
             }
             return result;
@@ -1021,7 +1021,7 @@ public class WeatherServiceImpl implements WeatherService {
             throw new RuntimeException("Error fetching 30天 climate forecast data", e);
         }
     }
-    
+
     private List<WeatherHistorical> fetchHistoricalWeatherFromApi(BigDecimal latitude, BigDecimal longitude, Long startTime, Long endTime, String units, String lang) {
         String url = UriComponentsBuilder.fromHttpUrl(weatherConfig.getHistoricalWeatherUrl())
                 .queryParam("lat", latitude)
@@ -1033,20 +1033,20 @@ public class WeatherServiceImpl implements WeatherService {
                 .queryParam("appid", weatherConfig.getApiKey())
                 .build()
                 .toUriString();
-        
+
         ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
         List<WeatherHistorical> result = new ArrayList<>();
-        
+
         try {
             JsonNode root = objectMapper.readTree(response.getBody());
             JsonNode list = root.path("list");
-            
+
             for (JsonNode item : list) {
                 WeatherHistorical historical = new WeatherHistorical();
                 historical.setLatitude(latitude);
                 historical.setLongitude(longitude);
                 historical.setDt(item.path("dt").asLong());
-                
+
                 JsonNode main = item.path("main");
                 historical.setTemp(BigDecimal.valueOf(main.path("temp").asDouble()));
                 historical.setFeelsLike(BigDecimal.valueOf(main.path("feels_like").asDouble()));
@@ -1054,13 +1054,13 @@ public class WeatherServiceImpl implements WeatherService {
                 historical.setTempMax(BigDecimal.valueOf(main.path("temp_max").asDouble()));
                 historical.setPressure(main.path("pressure").asInt());
                 historical.setHumidity(main.path("humidity").asInt());
-                
+
                 JsonNode wind = item.path("wind");
                 historical.setWindSpeed(BigDecimal.valueOf(wind.path("speed").asDouble()));
                 historical.setWindDeg(wind.path("deg").asInt());
-                
+
                 historical.setCloudsAll(item.path("clouds").path("all").asInt());
-                
+
                 if (!item.path("rain").isMissingNode()) {
                     if (!item.path("rain").path("1h").isMissingNode()) {
                         historical.setRain1h(BigDecimal.valueOf(item.path("rain").path("1h").asDouble()));
@@ -1069,7 +1069,7 @@ public class WeatherServiceImpl implements WeatherService {
                         historical.setRain3h(BigDecimal.valueOf(item.path("rain").path("3h").asDouble()));
                     }
                 }
-                
+
                 if (!item.path("snow").isMissingNode()) {
                     if (!item.path("snow").path("1h").isMissingNode()) {
                         historical.setSnow1h(BigDecimal.valueOf(item.path("snow").path("1h").asDouble()));
@@ -1078,7 +1078,7 @@ public class WeatherServiceImpl implements WeatherService {
                         historical.setSnow3h(BigDecimal.valueOf(item.path("snow").path("3h").asDouble()));
                     }
                 }
-                
+
                 if (item.path("weather").isArray() && item.path("weather").size() > 0) {
                     JsonNode weather = item.path("weather").get(0);
                     historical.setWeatherId(weather.path("id").asInt());
@@ -1086,33 +1086,33 @@ public class WeatherServiceImpl implements WeatherService {
                     historical.setWeatherDescription(weather.path("description").asText());
                     historical.setWeatherIcon(weather.path("icon").asText());
                 }
-                
+
                 result.add(historical);
             }
-            
+
             return result;
-            
+
         } catch (Exception e) {
             log.error("Error parsing historical weather API response", e);
             throw new RuntimeException("Error fetching historical weather data", e);
         }
     }
-    
+
     // 转换方法
     private WeatherCurrentDTO convertToCurrentDTO(WeatherCurrent entity) {
         WeatherCurrentDTO dto = new WeatherCurrentDTO();
         BeanUtils.copyProperties(entity, dto);
         // 设置可读的日期时间
         dto.setDt(entity.getDt());
-        
+
         // 如果存在location name，则优先使用name字段，否则使用locationName
         if (entity.getName() != null && !entity.getName().isEmpty()) {
             dto.setLocationName(entity.getName());
         }
-        
+
         return dto;
     }
-    
+
     private WeatherForecastDTO convertToForecastDTO(WeatherForecast entity) {
         WeatherForecastDTO dto = new WeatherForecastDTO();
         BeanUtils.copyProperties(entity, dto);
@@ -1123,7 +1123,7 @@ public class WeatherServiceImpl implements WeatherService {
         dto.setDtTxt(dateTime.format(dtFormatter));
         return dto;
     }
-    
+
     private WeatherHistoricalDTO convertToHistoricalDTO(WeatherHistorical entity) {
         WeatherHistoricalDTO dto = new WeatherHistoricalDTO();
         BeanUtils.copyProperties(entity, dto);
@@ -1134,4 +1134,4 @@ public class WeatherServiceImpl implements WeatherService {
         dto.setDtTxt(dateTime.format(dtFormatter));
         return dto;
     }
-} 
+}
