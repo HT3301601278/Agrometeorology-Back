@@ -289,9 +289,79 @@ public class WeatherServiceImpl implements WeatherService {
             historicalData = historicalRepository.findByCoordinatesInTimeRange(latitude, longitude, startTime, endTime);
             log.info("Using {} cached historical weather records for lat={}, lon={}", dataCount, latitude, longitude);
         } else {
-            historicalData = fetchHistoricalWeatherFromApi(latitude, longitude, startTime, endTime, request.getUnits(), request.getLang());
-            historicalRepository.saveAll(historicalData);
-            log.info("Fetched and saved {} new historical weather records for lat={}, lon={}, forceRefresh={}", historicalData.size(), latitude, longitude, request.getForceRefresh());
+            try {
+                historicalData = fetchHistoricalWeatherFromApi(latitude, longitude, startTime, endTime, request.getUnits(), request.getLang());
+                
+                try {
+                    // 逐个保存，避免批量保存时的唯一约束冲突
+                    List<WeatherHistorical> result = new ArrayList<>();
+                    for (WeatherHistorical historical : historicalData) {
+                        try {
+                            // 先检查是否已存在
+                            Optional<WeatherHistorical> existing = historicalRepository.findByCoordinatesAndDt(
+                                    latitude, longitude, historical.getDt());
+                            
+                            if (existing.isPresent()) {
+                                // 如果存在，直接使用现有记录
+                                result.add(existing.get());
+                                log.debug("Using existing historical weather record for dt={}", historical.getDt());
+                            } else {
+                                // 如果不存在，保存新记录
+                                result.add(historicalRepository.save(historical));
+                                log.debug("Saved new historical weather record for dt={}", historical.getDt());
+                            }
+                        } catch (DataIntegrityViolationException | ConstraintViolationException e) {
+                            // 处理唯一约束冲突
+                            log.warn("Constraint violation when saving historical weather for dt={}: {}", 
+                                    historical.getDt(), e.getMessage());
+                            
+                            try {
+                                Thread.sleep(35); // 使用35ms的延时，介于当前天气和预报天气之间
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                            }
+                            
+                            // 尝试查找冲突记录
+                            Optional<WeatherHistorical> conflictRecord = historicalRepository.findByCoordinatesAndDt(
+                                    latitude, longitude, historical.getDt());
+                            
+                            if (conflictRecord.isPresent()) {
+                                result.add(conflictRecord.get());
+                                log.info("Retrieved existing historical weather after constraint violation for dt={}", 
+                                        historical.getDt());
+                            } else {
+                                // 如果找不到，使用原始对象（不含ID）
+                                log.warn("Could not find existing record after constraint violation, using original data for dt={}", 
+                                        historical.getDt());
+                                result.add(historical);
+                            }
+                        } catch (Exception e) {
+                            // 其他异常
+                            log.error("Error saving historical weather for dt={}: {}", 
+                                    historical.getDt(), e.getMessage());
+                            result.add(historical); // 添加原始对象
+                        }
+                    }
+                    historicalData = result;
+                    log.info("Processed {} historical weather records with individual save", historicalData.size());
+                } catch (Exception e) {
+                    // 如果整个保存过程失败，记录错误但继续使用API数据
+                    log.error("Failed to save historical weather data: {}", e.getMessage(), e);
+                }
+            } catch (Exception e) {
+                // 处理API调用或其他处理错误
+                log.error("Error fetching historical weather data: {}", e.getMessage(), e);
+                
+                // 尝试从数据库获取可用数据
+                historicalData = historicalRepository.findByCoordinatesInTimeRange(
+                        latitude, longitude, startTime, endTime);
+                
+                if (historicalData.isEmpty()) {
+                    log.warn("No historical weather data available in database, returning empty list");
+                } else {
+                    log.info("Using {} existing historical weather records as fallback", historicalData.size());
+                }
+            }
         }
         return historicalData.stream().map(this::convertToHistoricalDTO).collect(Collectors.toList());
     }
