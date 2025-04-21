@@ -41,11 +41,6 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         
         announcement = announcementRepository.save(announcement);
         
-        // 如果是立即发布的公告，则发送系统通知
-        if (status != null && status == 1) {
-            notifyUsersAboutAnnouncement(announcement);
-        }
-        
         return announcement;
     }
 
@@ -84,9 +79,6 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         }
         
         announcement = announcementRepository.save(announcement);
-        
-        // 发送系统通知
-        notifyUsersAboutAnnouncement(announcement);
         
         return announcement;
     }
@@ -131,21 +123,5 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     @Override
     public List<Announcement> findActiveAnnouncementsByType(Integer type) {
         return announcementRepository.findActiveAnnouncementsByType(type, LocalDateTime.now());
-    }
-    
-    /**
-     * 向所有用户发送公告通知
-     */
-    private void notifyUsersAboutAnnouncement(Announcement announcement) {
-        String title = "新公告: " + announcement.getTitle();
-        String content = announcement.getContent();
-        
-        // 使用通知服务发送系统通知
-        try {
-            notificationService.sendNotificationToAllUsers(title, content, 1);
-            logger.info("已向所有用户发送公告通知: {}", announcement.getId());
-        } catch (Exception e) {
-            logger.error("发送公告通知失败: {}", e.getMessage());
-        }
     }
 } 
