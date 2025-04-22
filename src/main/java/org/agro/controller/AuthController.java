@@ -56,6 +56,19 @@ public class AuthController {
     }
 
     /**
+     * 忘记密码 - 验证身份并发送验证码
+     */
+    @PostMapping("/password/forgot")
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest forgotPasswordRequest) {
+        boolean result = userService.sendForgotPasswordCode(forgotPasswordRequest);
+        if (result) {
+            return ResponseEntity.ok(ApiResponse.success("验证码已发送，请检查您的邮箱", null));
+        } else {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("用户名或邮箱不正确"));
+        }
+    }
+
+    /**
      * 重置密码
      */
     @PostMapping("/password/reset")

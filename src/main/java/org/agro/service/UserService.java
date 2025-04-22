@@ -1,6 +1,7 @@
 package org.agro.service;
 
 import org.agro.dto.AuthResponse;
+import org.agro.dto.ForgotPasswordRequest;
 import org.agro.dto.PasswordChangeRequest;
 import org.agro.dto.PasswordResetRequest;
 import org.agro.dto.UserUpdateRequest;
@@ -56,6 +57,11 @@ public interface UserService {
      * 发送密码重置验证码
      */
     void sendPasswordResetCode(String email);
+
+    /**
+     * 验证用户名和邮箱是否匹配，并发送忘记密码验证码
+     */
+    boolean sendForgotPasswordCode(ForgotPasswordRequest forgotPasswordRequest);
 
     /**
      * 重置密码

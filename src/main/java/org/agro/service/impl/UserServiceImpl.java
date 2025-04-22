@@ -1,6 +1,7 @@
 package org.agro.service.impl;
 
 import org.agro.dto.AuthResponse;
+import org.agro.dto.ForgotPasswordRequest;
 import org.agro.dto.PasswordChangeRequest;
 import org.agro.dto.PasswordResetRequest;
 import org.agro.dto.UserUpdateRequest;
@@ -203,6 +204,38 @@ public class UserServiceImpl implements UserService {
         
         // 发送验证码到邮箱
         emailService.sendPasswordResetVerificationCode(email, verificationCode);
+    }
+
+    @Override
+    public boolean sendForgotPasswordCode(ForgotPasswordRequest forgotPasswordRequest) {
+        String username = forgotPasswordRequest.getUsername();
+        String email = forgotPasswordRequest.getEmail();
+        
+        // 验证用户名是否存在
+        Optional<User> optionalUser = userRepository.findByUsername(username);
+        if (optionalUser.isEmpty()) {
+            logger.info("尝试找回密码的用户名不存在: {}", username);
+            return false;
+        }
+        
+        User user = optionalUser.get();
+        
+        // 验证用户名和邮箱是否匹配
+        if (!user.getEmail().equals(email)) {
+            logger.info("用户名和邮箱不匹配: username={}, email={}", username, email);
+            return false;
+        }
+        
+        // 生成6位数字验证码
+        String verificationCode = generateVerificationCode();
+        
+        // 存储验证码 (实际应用中应该使用Redis等存储，并设置过期时间)
+        passwordResetCodes.put(email, verificationCode);
+        
+        // 发送验证码到邮箱
+        emailService.sendPasswordResetVerificationCode(email, verificationCode);
+        
+        return true;
     }
 
     @Override
