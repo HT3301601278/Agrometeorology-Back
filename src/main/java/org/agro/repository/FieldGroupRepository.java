@@ -2,6 +2,8 @@ package org.agro.repository;
 
 import org.agro.entity.FieldGroup;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -26,4 +28,12 @@ public interface FieldGroupRepository extends JpaRepository<FieldGroup, Long> {
      * @return 地块组
      */
     FieldGroup findByUserIdAndName(Long userId, String name);
+    
+    /**
+     * 删除用户的所有地块组
+     * @param userId 用户ID
+     */
+    @Modifying
+    @Query("DELETE FROM FieldGroup fg WHERE fg.userId = ?1")
+    void deleteByUserId(Long userId);
 } 

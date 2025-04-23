@@ -5,6 +5,8 @@ import org.agro.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -43,4 +45,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
      * 根据用户ID统计未读通知数量
      */
     long countByUserIdAndIsReadFalse(Long userId);
+    
+    /**
+     * 删除用户的所有通知
+     */
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.user.id = ?1")
+    void deleteByUserId(Long userId);
 } 

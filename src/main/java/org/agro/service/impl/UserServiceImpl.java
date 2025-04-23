@@ -3,6 +3,9 @@ package org.agro.service.impl;
 import org.agro.dto.*;
 import org.agro.entity.NotificationSetting;
 import org.agro.entity.User;
+import org.agro.repository.FieldGroupRepository;
+import org.agro.repository.FieldRepository;
+import org.agro.repository.NotificationRepository;
 import org.agro.repository.NotificationSettingRepository;
 import org.agro.repository.UserRepository;
 import org.agro.security.JwtUtils;
@@ -41,6 +44,15 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private NotificationSettingRepository notificationSettingRepository;
+    
+    @Autowired
+    private NotificationRepository notificationRepository;
+    
+    @Autowired
+    private FieldRepository fieldRepository;
+    
+    @Autowired
+    private FieldGroupRepository fieldGroupRepository;
 
     @Autowired
     private AuthenticationManager authenticationManager;
@@ -279,8 +291,27 @@ public class UserServiceImpl implements UserService {
             return false;
         }
 
-        userRepository.deleteById(userId);
-        return true;
+        // 添加删除通知记录的逻辑，解决外键约束问题
+        try {
+            // 先删除与用户相关的通知记录
+            notificationRepository.deleteByUserId(userId);
+            
+            // 再删除用户的通知设置
+            notificationSettingRepository.deleteByUserId(userId);
+            
+            // 删除用户的地块数据
+            fieldRepository.deleteByUserId(userId);
+            
+            // 删除用户的地块组数据
+            fieldGroupRepository.deleteByUserId(userId);
+            
+            // 最后删除用户
+            userRepository.deleteById(userId);
+            return true;
+        } catch (Exception e) {
+            logger.error("删除用户时发生错误: {}", e.getMessage(), e);
+            return false;
+        }
     }
 
     @Override

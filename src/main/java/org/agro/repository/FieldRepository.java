@@ -2,6 +2,8 @@ package org.agro.repository;
 
 import org.agro.entity.Field;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -41,4 +43,12 @@ public interface FieldRepository extends JpaRepository<Field, Long> {
      * @return 地块列表
      */
     List<Field> findByGroupId(Long groupId);
+    
+    /**
+     * 删除用户的所有地块
+     * @param userId 用户ID
+     */
+    @Modifying
+    @Query("DELETE FROM Field f WHERE f.userId = ?1")
+    void deleteByUserId(Long userId);
 } 
