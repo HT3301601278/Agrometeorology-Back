@@ -13,18 +13,18 @@ public interface NotificationService {
     /**
      * 创建通知
      */
-    Notification createNotification(Long userId, String title, String content, Integer type);
+    Notification createNotification(Long userId, String title, String content);
 
     /**
      * 发送通知
      * 根据用户通知设置，可能会同时发送站内通知和邮件通知
      */
-    void sendNotification(Long userId, String title, String content, Integer type);
+    void sendNotification(Long userId, String title, String content);
 
     /**
      * 批量发送通知
      */
-    void sendNotificationToAllUsers(String title, String content, Integer type);
+    void sendNotificationToAllUsers(String title, String content);
 
     /**
      * 查找用户的所有通知

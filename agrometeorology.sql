@@ -78,7 +78,6 @@ CREATE TABLE `notification`  (
   `user_id` bigint(20) NOT NULL COMMENT '用户ID',
   `title` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '通知标题',
   `content` text CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '通知内容',
-  `type` int(11) NOT NULL COMMENT '通知类型',
   `is_read` bit(1) NOT NULL COMMENT '是否已读',
   `created_at` datetime NOT NULL COMMENT '创建时间',
   PRIMARY KEY (`id`) USING BTREE,

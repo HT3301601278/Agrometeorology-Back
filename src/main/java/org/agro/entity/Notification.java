@@ -28,9 +28,6 @@ public class Notification {
     private String content;
 
     @Column(nullable = false)
-    private Integer type; // 1:系统通知 2:预警通知
-
-    @Column(nullable = false)
     private Boolean isRead = false;
 
     @CreationTimestamp

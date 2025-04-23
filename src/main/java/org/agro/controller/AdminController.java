@@ -147,7 +147,7 @@ public class AdminController {
         String title = data.get("title");
         String content = data.get("content");
         
-        notificationService.sendNotificationToAllUsers(title, content, 1); // 1表示系统通知
+        notificationService.sendNotificationToAllUsers(title, content);
         return ResponseEntity.ok(ApiResponse.success("系统通知已发送", null));
     }
 }

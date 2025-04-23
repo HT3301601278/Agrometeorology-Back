@@ -14,7 +14,6 @@ public class NotificationDTO {
     private Long userId;
     private String title;
     private String content;
-    private Integer type;
     private Boolean isRead;
     private LocalDateTime createdAt;
     
@@ -27,7 +26,6 @@ public class NotificationDTO {
         dto.setUserId(notification.getUser().getId());
         dto.setTitle(notification.getTitle());
         dto.setContent(notification.getContent());
-        dto.setType(notification.getType());
         dto.setIsRead(notification.getIsRead());
         dto.setCreatedAt(notification.getCreatedAt());
         return dto;

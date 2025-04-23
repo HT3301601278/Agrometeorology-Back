@@ -40,7 +40,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
-    public Notification createNotification(Long userId, String title, String content, Integer type) {
+    public Notification createNotification(Long userId, String title, String content) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));
 
@@ -48,7 +48,6 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setUser(user);
         notification.setTitle(title);
         notification.setContent(content);
-        notification.setType(type);
         notification.setIsRead(false);
 
         return notificationRepository.save(notification);
@@ -56,7 +55,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
-    public void sendNotification(Long userId, String title, String content, Integer type) {
+    public void sendNotification(Long userId, String title, String content) {
         // 检查用户是否存在
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));
@@ -73,7 +72,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         // 如果用户设置了接收系统通知，则创建系统通知
         if (setting.getSystemNotify()) {
-            createNotification(userId, title, content, type);
+            createNotification(userId, title, content);
         }
 
         // 如果用户设置了接收邮件通知且有邮箱，则发送邮件通知
@@ -88,13 +87,13 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
-    public void sendNotificationToAllUsers(String title, String content, Integer type) {
+    public void sendNotificationToAllUsers(String title, String content) {
         // 获取所有角色为USER的用户
         List<User> users = userRepository.findByRole("USER");
         
         for (User user : users) {
             try {
-                sendNotification(user.getId(), title, content, type);
+                sendNotification(user.getId(), title, content);
             } catch (Exception e) {
                 logger.error("发送通知给用户[{}]失败: {}", user.getUsername(), e.getMessage());
             }
