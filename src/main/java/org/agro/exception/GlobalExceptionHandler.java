@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -32,9 +33,19 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleException(Exception e) {
-        logger.error("未捕获的异常", e);
+        logger.error("未捕获的异常: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.fail(500, "服务器内部错误"));
+    }
+
+    /**
+     * 处理账户冻结异常
+     */
+    @ExceptionHandler(AccountFrozenException.class)
+    public ResponseEntity<?> handleAccountFrozenException(AccountFrozenException e) {
+        logger.error("账户冻结异常: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.fail(403, e.getMessage()));
     }
 
     /**
@@ -42,13 +53,22 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<?> handleAuthenticationException(AuthenticationException e) {
-        logger.error("认证异常", e);
-        String message = "认证失败";
+        // 检查是否是账户冻结异常被包装在InternalAuthenticationServiceException中
+        if (e instanceof InternalAuthenticationServiceException) {
+            Throwable cause = e.getCause();
+            if (cause instanceof AccountFrozenException) {
+                logger.error("账户冻结: {}", cause.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(ApiResponse.fail(403, cause.getMessage()));
+            }
+        }
         
+        String message = "认证失败";
         if (e instanceof BadCredentialsException) {
             message = "用户名或密码错误";
         }
         
+        logger.error("认证异常: {}", message);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.fail(401, message));
     }
@@ -58,7 +78,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<?> handleAccessDeniedException(AccessDeniedException e) {
-        logger.error("权限不足", e);
+        logger.error("权限不足: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.fail(403, "权限不足"));
     }
@@ -113,7 +133,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<?> handleRuntimeException(RuntimeException e) {
-        logger.error("业务异常", e);
+        logger.error("业务异常: {}", e.getMessage());
         return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
     }
 } 

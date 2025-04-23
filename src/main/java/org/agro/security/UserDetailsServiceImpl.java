@@ -1,6 +1,7 @@
 package org.agro.security;
 
 import org.agro.entity.User;
+import org.agro.exception.AccountFrozenException;
 import org.agro.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,9 +24,9 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("未找到用户: " + username));
 
-        // 判断用户状态
+        // 判断用户状态，如果账户被冻结，抛出AccountFrozenException
         if (!user.getStatus()) {
-            throw new UsernameNotFoundException("用户账号已被冻结: " + username);
+            throw new AccountFrozenException("账户已被冻结");
         }
 
         return UserDetailsImpl.build(user);
