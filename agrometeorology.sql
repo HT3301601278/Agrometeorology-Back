@@ -57,6 +57,8 @@ CREATE TABLE `alert_rule`  (
   `threshold2` decimal(10, 2) NULL DEFAULT NULL COMMENT '第二阈值（可选）',
   `message` varchar(250) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '预警消息模板',
   `enabled` bit(1) NOT NULL COMMENT '是否启用',
+  `email_notify` bit(1) NOT NULL COMMENT '是否发送邮件通知',
+  `system_notify` bit(1) NOT NULL COMMENT '是否发送系统通知',
   `created_at` datetime NOT NULL COMMENT '创建时间',
   `updated_at` datetime(6) NOT NULL COMMENT '更新时间',
   `field_id` bigint(20) NOT NULL COMMENT '地块ID',
