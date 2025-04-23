@@ -82,6 +82,7 @@
 ### 认证 (`/auth`)
 *   `POST /register`: 用户注册
 *   `POST /login`: 用户登录
+*   `POST /password/forgot`: 忘记密码，验证身份并发送验证码
 *   `POST /password/reset-request`: 请求密码重置验证码
 *   `POST /password/reset`: 重置密码
 
