@@ -5,11 +5,11 @@ import org.agro.service.SystemConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-import org.springframework.core.io.ClassPathResource;
 
 import javax.mail.MessagingException;
 import javax.mail.internet.MimeMessage;
@@ -24,26 +24,26 @@ public class EmailServiceImpl implements EmailService {
 
     @Autowired
     private JavaMailSender mailSender;
-    
+
     @Autowired
     private SystemConfigService systemConfigService;
 
     @Override
     public void sendSimpleEmail(String to, String subject, String content) {
         SimpleMailMessage message = new SimpleMailMessage();
-        
+
         // 设置发件人为配置的邮箱用户名
         String fromEmail = getFromEmail();
         if (fromEmail == null) {
             logger.error("发送简单邮件失败: 未配置发件人邮箱");
             return;
         }
-        
+
         message.setFrom(fromEmail);
         message.setTo(to);
         message.setSubject(subject);
         message.setText(content);
-        
+
         mailSender.send(message);
         logger.info("发送简单邮件成功: {}", to);
     }
@@ -57,15 +57,15 @@ public class EmailServiceImpl implements EmailService {
                 logger.error("发送HTML邮件失败: 未配置发件人邮箱");
                 return;
             }
-            
+
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            
+
             helper.setFrom(fromEmail);
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(content, true);
-            
+
             mailSender.send(message);
             logger.info("发送HTML邮件成功: {}", to);
         } catch (MessagingException e) {
@@ -75,7 +75,7 @@ public class EmailServiceImpl implements EmailService {
 
     /**
      * 发送带内嵌图片的HTML邮件
-     * 
+     *
      * @param to 收件人
      * @param subject 主题
      * @param content HTML内容
@@ -90,15 +90,15 @@ public class EmailServiceImpl implements EmailService {
                 logger.error("发送HTML邮件失败: 未配置发件人邮箱");
                 return;
             }
-            
+
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            
+
             helper.setFrom(fromEmail);
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(content, true);
-            
+
             // 添加内嵌图片
             ClassPathResource imageResource = new ClassPathResource(imageResourcePath);
             if (imageResource.exists()) {
@@ -106,7 +106,7 @@ public class EmailServiceImpl implements EmailService {
             } else {
                 logger.warn("内嵌图片资源不存在: {}", imageResourcePath);
             }
-            
+
             mailSender.send(message);
             logger.info("发送带内嵌图片的HTML邮件成功: {}", to);
         } catch (MessagingException e) {
@@ -119,10 +119,10 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public void sendPasswordResetVerificationCode(String to, String verificationCode) {
         String subject = "【农业气象监测系统】密码重置验证码";
-        
+
         // 创建HTML邮件模板
         String content = buildPasswordResetEmailTemplate(verificationCode);
-        
+
         // 使用内嵌图片发送邮件
         sendHtmlEmailWithInlineImage(to, subject, content, "static/images/logo.png", "logoImage");
     }
@@ -140,8 +140,8 @@ public class EmailServiceImpl implements EmailService {
         // 格式化显示时间
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String expiryTimeString = expiryTime.format(formatter);
-        
-        String bodyContent = 
+
+        String bodyContent =
                 "<p style=\"margin-top: 0; font-size: 16px;\">尊敬的用户：</p>\n" +
                 "<p style=\"font-size: 16px;\">您好！您正在进行密码重置操作，请使用以下验证码完成操作：</p>\n" +
                 "<div style=\"margin: 30px auto; text-align: center; background-color: #f8f8f8; padding: 15px; border-radius: 5px; border-left: 4px solid #2c7e43;\">\n" +
@@ -150,19 +150,19 @@ public class EmailServiceImpl implements EmailService {
                 "<p style=\"font-size: 15px;\">此验证码有效期为<span style=\"color: #e74c3c; font-weight: bold;\">10分钟</span>，将在 <span style=\"color: #e74c3c; font-weight: bold;\">" + expiryTimeString + "</span> 过期。</p>\n" +
                 "<p style=\"font-size: 15px;\">请勿将验证码泄露给他人。</p>\n" +
                 "<p style=\"font-size: 15px;\">如果您并未请求此验证码，可能是有人误输入了您的邮箱地址。请忽略此邮件，无需进行任何操作。</p>";
-        
+
         return buildBaseEmailTemplate("密码重置验证码", bodyContent);
     }
 
     @Override
     public void sendNotificationEmail(String to, String title, String content) {
         String subject = "【农业气象监测系统】" + title;
-        
+
         // 使用HTML格式发送通知邮件
         String htmlContent = buildNotificationEmailTemplate(title, content);
         sendHtmlEmailWithInlineImage(to, subject, htmlContent, "static/images/logo.png", "logoImage");
     }
-    
+
     /**
      * 构建通知邮件HTML模板
      * @param title 通知标题
@@ -170,19 +170,19 @@ public class EmailServiceImpl implements EmailService {
      * @return HTML内容
      */
     private String buildNotificationEmailTemplate(String title, String content) {
-        String bodyContent = 
+        String bodyContent =
                 "<p style=\"margin-top: 0; font-size: 16px;\">尊敬的用户：</p>\n" +
                 "<h2 style=\"font-size: 18px; color: #2c7e43; margin: 20px 0 15px;\">" + title + "</h2>\n" +
                 "<div style=\"margin: 20px 0; padding: 15px; background-color: #f8f8f8; border-radius: 5px; border-left: 4px solid #2c7e43;\">\n" +
                 "    <p style=\"margin: 0; font-size: 15px;\">" + content.replace("\n", "<br/>") + "</p>\n" +
                 "</div>";
-        
+
         return buildBaseEmailTemplate(title, bodyContent);
     }
-    
+
     /**
      * 构建基础邮件HTML模板
-     * 
+     *
      * @param title 邮件标题
      * @param bodyContent 邮件正文内容
      * @return 完整的HTML邮件内容
@@ -214,7 +214,7 @@ public class EmailServiceImpl implements EmailService {
                "</body>\n" +
                "</html>";
     }
-    
+
     /**
      * 获取发件人邮箱
      */
@@ -232,4 +232,4 @@ public class EmailServiceImpl implements EmailService {
             return null;
         }
     }
-} 
+}

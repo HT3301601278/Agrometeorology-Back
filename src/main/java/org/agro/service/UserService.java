@@ -1,10 +1,6 @@
 package org.agro.service;
 
-import org.agro.dto.AuthResponse;
-import org.agro.dto.ForgotPasswordRequest;
-import org.agro.dto.PasswordChangeRequest;
-import org.agro.dto.PasswordResetRequest;
-import org.agro.dto.UserUpdateRequest;
+import org.agro.dto.*;
 import org.agro.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -82,4 +78,4 @@ public interface UserService {
      * 分页查询所有用户
      */
     Page<User> findAllUsers(Pageable pageable);
-} 
+}
