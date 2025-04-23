@@ -1,13 +1,18 @@
 package org.agro.controller;
 
 import org.agro.dto.ApiResponse;
+import org.agro.dto.NotificationDTO;
+import org.agro.entity.Notification;
 import org.agro.entity.SystemConfig;
 import org.agro.entity.User;
 import org.agro.service.NotificationService;
 import org.agro.service.SystemConfigService;
 import org.agro.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -15,7 +20,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 管理员控制器
@@ -24,6 +31,8 @@ import java.util.Map;
 @RequestMapping("/admin")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
 
     @Autowired
     private UserService userService;
@@ -149,5 +158,39 @@ public class AdminController {
         
         notificationService.sendNotificationToAllUsers(title, content);
         return ResponseEntity.ok(ApiResponse.success("系统通知已发送", null));
+    }
+
+    /**
+     * 获取管理员发布过的所有通知
+     */
+    @GetMapping("/notifications")
+    public ResponseEntity<?> getAdminNotifications(
+            @PageableDefault(sort = {"createdAt"}, direction = Sort.Direction.DESC) Pageable pageable) {
+        
+        logger.info("开始查询管理员通知...");
+        
+        // 检查数据库中是否有通知
+        long totalNotifications = notificationService.countAllNotifications();
+        logger.info("数据库中总共有 {} 条通知", totalNotifications);
+        
+        Page<Notification> notifications = notificationService.findAdminNotifications(pageable);
+        logger.info("找到 {} 条管理员通知", notifications.getTotalElements());
+        
+        // 将实体转换为DTO
+        List<NotificationDTO> dtoList = notifications.getContent().stream()
+                .map(notification -> {
+                    logger.info("管理员通知：{}", notification.getTitle());
+                    return NotificationDTO.fromEntity(notification);
+                })
+                .collect(Collectors.toList());
+        
+        // 创建新的Page对象
+        Page<NotificationDTO> dtoPage = new PageImpl<>(
+                dtoList, 
+                notifications.getPageable(), 
+                notifications.getTotalElements()
+        );
+        
+        return ResponseEntity.ok(ApiResponse.success(dtoPage));
     }
 }

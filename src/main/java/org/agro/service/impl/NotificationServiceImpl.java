@@ -13,11 +13,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 /**
  * 通知服务实现类
@@ -162,5 +166,70 @@ public class NotificationServiceImpl implements NotificationService {
     public Notification findById(Long notificationId) {
         return notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("通知不存在"));
+    }
+
+    @Override
+    public Page<Notification> findAdminNotifications(Pageable pageable) {
+        try {
+            // 优先使用原生SQL查询 - 这是最可靠的方法
+            List<Notification> adminNotifications = notificationRepository.findAdminNotificationsNative();
+            logger.info("原生SQL查询到管理员通知 {} 条", adminNotifications.size());
+            
+            if (!adminNotifications.isEmpty()) {
+                // 手动实现分页
+                int start = (int) pageable.getOffset();
+                int end = Math.min(start + pageable.getPageSize(), adminNotifications.size());
+                List<Notification> pageContent = start < end ? 
+                        adminNotifications.subList(start, end) : new ArrayList<>();
+                
+                return new PageImpl<>(pageContent, pageable, adminNotifications.size());
+            }
+            
+            // 如果原生SQL没有结果，尝试使用JPQL方法查询
+            return notificationRepository.findAdminNotificationsJpql(pageable);
+        } catch (Exception e) {
+            logger.error("查询管理员通知失败: {}", e.getMessage());
+            
+            // 备选方案：手动实现分组查询
+            List<Object[]> adminNotificationGroups = notificationRepository.findDistinctAdminNotificationTitlesAndContents();
+            
+            List<Notification> adminNotifications = new ArrayList<>();
+            
+            // 对于每个标题+内容组合，只取最新的一条记录
+            for (Object[] group : adminNotificationGroups) {
+                String title = (String) group[0];
+                String content = (String) group[1];
+                
+                // 获取该标题内容下最新的一条通知
+                List<Notification> latestNotifications = notificationRepository.findLatestByTitleAndContent(
+                        title, content, PageRequest.of(0, 1));
+                
+                if (!latestNotifications.isEmpty()) {
+                    adminNotifications.add(latestNotifications.get(0));
+                }
+            }
+            
+            // 手动进行排序
+            adminNotifications.sort((n1, n2) -> n2.getCreatedAt().compareTo(n1.getCreatedAt()));
+            
+            // 手动实现分页
+            int start = (int) pageable.getOffset();
+            int end = Math.min((start + pageable.getPageSize()), adminNotifications.size());
+            
+            List<Notification> pageContent = start < end ? 
+                    adminNotifications.subList(start, end) : new ArrayList<>();
+            
+            // 创建分页对象
+            return new PageImpl<>(
+                    pageContent,
+                    pageable,
+                    adminNotifications.size()
+            );
+        }
+    }
+
+    @Override
+    public long countAllNotifications() {
+        return notificationRepository.count();
     }
 } 

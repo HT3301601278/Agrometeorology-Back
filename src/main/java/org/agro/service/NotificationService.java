@@ -60,4 +60,14 @@ public interface NotificationService {
      * 根据ID查找通知
      */
     Notification findById(Long notificationId);
+
+    /**
+     * 查询管理员发布的所有通知（分页）
+     */
+    Page<Notification> findAdminNotifications(Pageable pageable);
+
+    /**
+     * 统计所有通知数量
+     */
+    long countAllNotifications();
 } 
